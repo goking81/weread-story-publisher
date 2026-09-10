@@ -1,0 +1,9 @@
+node_modules/
+.env
+data/
+npm-debug.log*
+screenshots/
+test.png
+test-chrome.png
+assets/history-deep-republic-set-hd.jpg
+assets/history-deep-republic-weread.jpg

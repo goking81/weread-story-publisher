@@ -1,0 +1,19 @@
+{
+  "identity": {
+    "mode": "name",
+    "nickname": "阅读者"
+  },
+  "report": {
+    "year": 2026,
+    "focusPercent": 71,
+    "totalMinutes": 2096,
+    "booksRead": 9,
+    "topBook": {
+      "title": "历史深处的民国（全集）",
+      "minutes": 1482,
+      "coverUrl": "/assets/history-deep-republic-one-hd.jpg"
+    },
+    "topics": ["历史", "人物传记", "年代小说", "文学"]
+  },
+  "expiresInDays": 30
+}

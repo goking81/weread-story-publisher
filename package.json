@@ -1,0 +1,15 @@
+{
+  "name": "weread-story-publisher",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Publish tokenized, mobile reading-story links from verified reading data.",
+  "type": "module",
+  "scripts": {
+    "start": "node --env-file-if-exists=.env server.mjs",
+    "dev": "node --watch --env-file-if-exists=.env server.mjs",
+    "test": "node --test test/server.test.mjs"
+  },
+  "dependencies": {
+    "qrcode": "^1.5.4"
+  }
+}
