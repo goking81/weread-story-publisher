@@ -1,3 +1,5 @@
+import qrcode from './qrcode.mjs';
+
 const pages = document.querySelectorAll('.page');
 const capture = Number(new URLSearchParams(location.search).get('slide'));
 if (capture >= 1 && capture <= pages.length) {
@@ -5,7 +7,7 @@ if (capture >= 1 && capture <= pages.length) {
   pages.forEach((page, index) => page.style.display = index === capture - 1 ? 'flex' : 'none');
   pages[capture - 1].classList.add('seen');
 } else {
-  const observer = new IntersectionObserver(entries => entries.forEach(entry => entry.isIntersecting && entry.target.classList.add('seen')), {threshold:.45});
+  const observer = new IntersectionObserver(entries => entries.forEach(entry => entry.isIntersecting && entry.target.classList.add('seen')), { threshold: .45 });
   pages.forEach(page => observer.observe(page));
 }
 
@@ -25,18 +27,26 @@ if (storySlug) loadPublishedStory(storySlug);
 
 async function loadPublishedStory(slug) {
   try {
+    const key = location.hash.slice(1);
+    if (!key) throw new Error('这份阅读故事需要完整的加密分享链接。');
     const response = await fetch(`/api/stories/${slug}`);
-    if (!response.ok) throw new Error('故事链接已失效');
-    renderStory(await response.json(), slug);
-  } catch {
-    document.querySelector('.report').replaceWith(Object.assign(document.createElement('main'), {
-      className: 'story-unavailable', textContent: '这份阅读故事已失效或不存在。'
-    }));
-    document.title = '阅读故事不可用';
+    if (!response.ok) throw new Error('这份阅读故事已失效或不存在。');
+    const { envelope } = await response.json();
+    renderStory(await decryptStory(envelope, key));
+  } catch (error) {
+    showUnavailable(error.message || '这份阅读故事无法打开。');
   }
 }
 
-function renderStory(story, slug) {
+async function decryptStory(envelope, key) {
+  const rawKey = base64UrlToBytes(key);
+  if (rawKey.length !== 32) throw new Error('这份阅读故事的加密密钥无效。');
+  const cryptoKey = await crypto.subtle.importKey('raw', rawKey, { name: 'AES-GCM' }, false, ['decrypt']);
+  const plaintext = await crypto.subtle.decrypt({ name: 'AES-GCM', iv: base64UrlToBytes(envelope.iv) }, cryptoKey, base64UrlToBytes(envelope.ciphertext));
+  return JSON.parse(new TextDecoder().decode(plaintext));
+}
+
+function renderStory(story) {
   const { report, identity } = story;
   const set = (name, value) => document.querySelectorAll(`[data-story="${name}"]`).forEach(node => node.textContent = String(value));
   const totalHours = Math.floor(report.totalMinutes / 60);
@@ -59,17 +69,26 @@ function renderStory(story, slug) {
   topicLine.replaceChildren(...report.topics.slice(0, 3).flatMap((topic, index) => index ? [document.createElement('br'), document.createTextNode(topic)] : [document.createTextNode(topic)]));
   applyIdentity(identity);
   document.querySelector('#identityOptions').hidden = true;
-  identityNote.textContent = `本次发布署名：${identityLabel(identity.mode)}。`;
-  const publicUrl = new URL(`/s/${slug}`, location.origin).href;
-  document.querySelector('#storyQr').src = `/api/stories/${slug}/qr.png`;
-  document.querySelector('#storyQr').alt = '阅读故事二维码';
-  const storyLink = document.querySelector('#storyLink');
-  storyLink.replaceChildren(
-    document.createTextNode(`专属地址 · ${publicUrl}`),
-    document.createElement('br'),
-    Object.assign(document.createElement('small'), { textContent: '链接可在微信中直接打开和转发。' })
-  );
+  identityNote.textContent = `本次发布署名：${identityLabel(identity.mode)}。内容已加密，将在 30 天后自动删除。`;
+  renderShareCode();
   document.title = `${report.year} 阅读故事`;
+}
+
+function renderShareCode() {
+  const qr = document.querySelector('#storyQr');
+  const storyLink = document.querySelector('#storyLink');
+  qr.hidden = true;
+  storyLink.replaceChildren(
+    document.createTextNode('这份链接已端到端加密 · 30 天后自动失效'),
+    document.createElement('br'),
+    Object.assign(document.createElement('small'), { textContent: '请在微信右上角转发给朋友。' })
+  );
+  const code = qrcode(0, 'M');
+  code.addData(location.href, 'Byte');
+  code.make();
+  qr.src = code.createDataURL(4, 4);
+  qr.alt = '阅读故事二维码';
+  qr.hidden = false;
 }
 
 function applyIdentity(identity) {
@@ -89,4 +108,16 @@ function applyIdentity(identity) {
 
 function identityLabel(mode) {
   return ({ name_avatar: '昵称与头像', name: '仅昵称', anonymous: '匿名' })[mode] || '匿名';
+}
+
+function base64UrlToBytes(value) {
+  const padded = value.replace(/-/g, '+').replace(/_/g, '/').padEnd(Math.ceil(value.length / 4) * 4, '=');
+  return Uint8Array.from(atob(padded), character => character.charCodeAt(0));
+}
+
+function showUnavailable(message) {
+  document.querySelector('.report').replaceWith(Object.assign(document.createElement('main'), {
+    className: 'story-unavailable', textContent: message
+  }));
+  document.title = '阅读故事不可用';
 }

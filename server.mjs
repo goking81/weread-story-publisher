@@ -3,27 +3,31 @@ import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
 import { randomBytes, timingSafeEqual } from 'node:crypto';
 import { dirname, extname, isAbsolute, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import QRCode from 'qrcode';
 
 const root = dirname(fileURLToPath(import.meta.url));
 const port = positiveInteger(process.env.PORT, 3000);
 const publicBaseUrl = process.env.PUBLIC_BASE_URL?.replace(/\/$/, '');
-const publishApiKey = process.env.PUBLISH_API_KEY;
 const dataFile = resolve(root, process.env.STORY_DATA_FILE || './data/stories.json');
+const inviteCodes = new Set((process.env.PUBLISH_INVITE_CODES || '').split(',').map(code => code.trim()).filter(Boolean));
+const defaultExpiryDays = boundedEnvironmentInteger(process.env.DEFAULT_EXPIRY_DAYS, 30, 1, 365);
+const maxPublishesPerHour = boundedEnvironmentInteger(process.env.PUBLISH_MAX_PUBLISHES_PER_HOUR, 5, 1, 100);
+const publishLimits = new Map();
 const staticFiles = new Map([
   ['/', 'index.html'],
   ['/index.html', 'index.html'],
   ['/story.css', 'story.css'],
   ['/story.js', 'story.js'],
+  ['/qrcode.mjs', 'node_modules/qrcode-generator/dist/qrcode.mjs'],
   ['/s/story.css', 'story.css'],
-  ['/s/story.js', 'story.js']
+  ['/s/story.js', 'story.js'],
+  ['/s/qrcode.mjs', 'node_modules/qrcode-generator/dist/qrcode.mjs']
 ]);
-const mimeTypes = { '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.jpg': 'image/jpeg', '.png': 'image/png' };
+const mimeTypes = { '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.jpg': 'image/jpeg', '.png': 'image/png' };
 let stories = await loadStories();
 
-if (!publishApiKey || publishApiKey.length < 24) {
-  throw new Error('PUBLISH_API_KEY 必须设置为至少 24 个字符的随机密钥。');
-}
+if (!inviteCodes.size) throw new Error('PUBLISH_INVITE_CODES 必须至少设置一个内测邀请码。');
+await purgeExpiredStories();
+setInterval(() => purgeExpiredStories().catch(console.error), 3600000).unref();
 
 createServer(async (request, response) => {
   try {
@@ -45,9 +49,6 @@ async function route(request, response) {
   if (request.method === 'GET' && storyMatch) return getStory(response, storyMatch[1]);
   if (request.method === 'DELETE' && storyMatch) return revokeStory(request, response, storyMatch[1]);
 
-  const qrMatch = pathname.match(/^\/api\/stories\/([A-Za-z0-9_-]{12,})\/qr\.png$/);
-  if (request.method === 'GET' && qrMatch) return getQr(response, qrMatch[1], url);
-
   const publicMatch = pathname.match(/^\/s\/([A-Za-z0-9_-]{12,})$/);
   if (request.method === 'GET' && publicMatch) {
     if (!findActiveStory(publicMatch[1])) return sendText(response, 404, '这份阅读故事已失效或不存在。');
@@ -61,66 +62,49 @@ async function route(request, response) {
 }
 
 async function createStory(request, response, url) {
-  if (!isAuthorized(request)) return sendJson(response, 401, { error: '未授权的发布请求。' });
+  if (!isValidInvite(request.headers['x-story-invite'])) return sendJson(response, 401, { error: '邀请码无效。' });
+  assertWithinPublishLimit(request);
   const payload = await readJson(request);
-  const story = normalizeStory(payload);
+  const story = normalizeEnvelope(payload);
   stories.push(story);
   await saveStories();
   const origin = originFor(url);
-  sendJson(response, 201, { slug: story.slug, url: `${origin}/s/${story.slug}`, qrUrl: `${origin}/api/stories/${story.slug}/qr.png`, expiresAt: story.expiresAt });
+  sendJson(response, 201, { slug: story.slug, url: `${origin}/s/${story.slug}`, expiresAt: story.expiresAt });
 }
 
 function getStory(response, slug) {
   const story = findActiveStory(slug);
   if (!story) return sendJson(response, 404, { error: '故事已失效或不存在。' });
-  sendJson(response, 200, publicStory(story));
+  sendJson(response, 200, { envelope: story.envelope, expiresAt: story.expiresAt });
 }
 
 async function revokeStory(request, response, slug) {
-  if (!isAuthorized(request)) return sendJson(response, 401, { error: '未授权的撤销请求。' });
   const index = stories.findIndex(story => story.slug === slug);
   if (index === -1) return sendJson(response, 404, { error: '故事不存在。' });
+  const revokeHash = request.headers['x-story-revoke'];
+  if (!sameSecret(revokeHash, stories[index].revokeHash)) return sendJson(response, 401, { error: '撤销凭据无效。' });
   stories.splice(index, 1);
   await saveStories();
   response.writeHead(204).end();
 }
 
-async function getQr(response, slug, url) {
-  if (!findActiveStory(slug)) return sendJson(response, 404, { error: '故事已失效或不存在。' });
-  const buffer = await QRCode.toBuffer(`${originFor(url)}/s/${slug}`, { type: 'png', width: 420, margin: 2, errorCorrectionLevel: 'M' });
-  response.writeHead(200, { 'Content-Type': 'image/png', 'Cache-Control': 'private, max-age=300' }).end(buffer);
-}
-
-function normalizeStory(payload) {
-  const report = payload?.report;
-  const identity = payload?.identity || {};
-  if (!report || typeof report !== 'object') throw badRequest('report 是必填对象。');
-  const year = boundedInteger(report.year, 2020, 2100, 'report.year');
-  const focusPercent = boundedInteger(report.focusPercent, 1, 100, 'report.focusPercent');
-  const totalMinutes = boundedInteger(report.totalMinutes, 1, 525600, 'report.totalMinutes');
-  const booksRead = boundedInteger(report.booksRead, 1, 1000, 'report.booksRead');
-  const topBook = report.topBook;
-  if (!topBook || typeof topBook !== 'object') throw badRequest('report.topBook 是必填对象。');
-  const title = boundedText(topBook.title, 1, 80, 'report.topBook.title');
-  const minutes = boundedInteger(topBook.minutes, 1, totalMinutes, 'report.topBook.minutes');
-  const coverUrl = safeImageUrl(topBook.coverUrl, 'report.topBook.coverUrl');
-  if (!Array.isArray(report.topics) || report.topics.length < 1 || report.topics.length > 4) throw badRequest('report.topics 需要 1–4 个关键词。');
-  const topics = report.topics.map((topic, index) => boundedText(topic, 1, 16, `report.topics[${index}]`));
-  const mode = ['name_avatar', 'name', 'anonymous'].includes(identity.mode) ? identity.mode : 'name_avatar';
-  const nickname = mode === 'anonymous' ? '' : boundedText(identity.nickname, 1, 32, 'identity.nickname');
-  const avatarUrl = mode === 'name_avatar' ? safeImageUrl(identity.avatarUrl, 'identity.avatarUrl') : '';
-  const expiresInDays = payload.expiresInDays === undefined ? 30 : boundedInteger(payload.expiresInDays, 1, 365, 'expiresInDays');
+function normalizeEnvelope(payload) {
+  if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw badRequest('请求体必须是加密信封。');
+  const allowedKeys = new Set(['envelope', 'revokeHash', 'expiresInDays']);
+  if (Object.keys(payload).some(key => !allowedKeys.has(key))) throw badRequest('发布接口不接收明文阅读数据。');
+  const envelope = payload.envelope;
+  if (!envelope || typeof envelope !== 'object' || envelope.version !== 1) throw badRequest('无效的加密信封版本。');
+  const iv = boundedBase64Url(envelope.iv, 16, 32, 'envelope.iv');
+  const ciphertext = boundedBase64Url(envelope.ciphertext, 1, 86000, 'envelope.ciphertext');
+  const revokeHash = boundedBase64Url(payload.revokeHash, 43, 43, 'revokeHash');
+  const expiresInDays = payload.expiresInDays === undefined ? defaultExpiryDays : boundedInteger(payload.expiresInDays, 1, 365, 'expiresInDays');
   return {
     slug: randomBytes(18).toString('base64url'),
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + expiresInDays * 86400000).toISOString(),
-    identity: { mode, nickname, avatarUrl },
-    report: { year, focusPercent, totalMinutes, booksRead, topBook: { title, minutes, coverUrl }, topics }
+    revokeHash,
+    envelope: { version: 1, iv, ciphertext }
   };
-}
-
-function publicStory(story) {
-  return { identity: story.identity, report: story.report, expiresAt: story.expiresAt };
 }
 
 function findActiveStory(slug) {
@@ -128,10 +112,31 @@ function findActiveStory(slug) {
   return story && Date.parse(story.expiresAt) > Date.now() ? story : null;
 }
 
-function isAuthorized(request) {
-  const provided = request.headers.authorization?.replace(/^Bearer\s+/i, '');
-  if (!provided || provided.length !== publishApiKey.length) return false;
-  return timingSafeEqual(Buffer.from(provided), Buffer.from(publishApiKey));
+async function purgeExpiredStories() {
+  const now = Date.now();
+  const activeStories = stories.filter(story => Date.parse(story.expiresAt) > now);
+  if (activeStories.length === stories.length) return;
+  stories = activeStories;
+  await saveStories();
+}
+
+function isValidInvite(value) {
+  const invite = Array.isArray(value) ? value[0] : value;
+  return typeof invite === 'string' && [...inviteCodes].some(code => sameSecret(invite, code));
+}
+
+function sameSecret(provided, expected) {
+  if (typeof provided !== 'string' || provided.length !== expected.length) return false;
+  return timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
+}
+
+function assertWithinPublishLimit(request) {
+  const client = request.socket.remoteAddress || 'unknown';
+  const now = Date.now();
+  const recent = (publishLimits.get(client) || []).filter(timestamp => now - timestamp < 3600000);
+  if (recent.length >= maxPublishesPerHour) throw tooManyRequests('此网络的发布次数已达本小时上限。');
+  recent.push(now);
+  publishLimits.set(client, recent);
 }
 
 async function readJson(request) {
@@ -139,7 +144,7 @@ async function readJson(request) {
   const parts = [];
   for await (const part of request) {
     size += part.length;
-    if (size > 30000) throw badRequest('请求体不能超过 30KB。');
+    if (size > 90000) throw badRequest('请求体不能超过 90KB。');
     parts.push(part);
   }
   try { return JSON.parse(Buffer.concat(parts).toString('utf8')); }
@@ -149,17 +154,21 @@ async function readJson(request) {
 async function loadStories() {
   try {
     const parsed = JSON.parse(await readFile(dataFile, 'utf8'));
-    return Array.isArray(parsed.stories) ? parsed.stories : [];
+    return Array.isArray(parsed.stories) ? parsed.stories.filter(isEncryptedStory) : [];
   } catch (error) {
     if (error.code === 'ENOENT') return [];
     throw error;
   }
 }
 
+function isEncryptedStory(story) {
+  return story?.envelope?.version === 1 && typeof story.revokeHash === 'string' && typeof story.expiresAt === 'string';
+}
+
 async function saveStories() {
   await mkdir(dirname(dataFile), { recursive: true });
   const temporaryFile = `${dataFile}.${process.pid}.${Date.now()}.tmp`;
-  await writeFile(temporaryFile, JSON.stringify({ version: 1, stories }, null, 2), { encoding: 'utf8', mode: 0o600 });
+  await writeFile(temporaryFile, JSON.stringify({ version: 2, stories }, null, 2), { encoding: 'utf8', mode: 0o600 });
   await rename(temporaryFile, dataFile);
 }
 
@@ -169,7 +178,13 @@ async function sendFile(response, relativePath) {
   if (pathFromRoot.startsWith('..') || isAbsolute(pathFromRoot)) return sendText(response, 403, 'Forbidden');
   try {
     const body = await readFile(filePath);
-    response.writeHead(200, { 'Content-Type': mimeTypes[extname(filePath)] || 'application/octet-stream', 'Cache-Control': 'public, max-age=300' }).end(body);
+    const extension = extname(filePath);
+    const headers = {
+      'Content-Type': mimeTypes[extension] || 'application/octet-stream',
+      'Cache-Control': ['.html', '.css', '.js', '.mjs'].includes(extension) ? 'no-cache' : 'public, max-age=300'
+    };
+    if (extension === '.html') headers['Referrer-Policy'] = 'no-referrer';
+    response.writeHead(200, headers).end(body);
   } catch (error) {
     if (error.code === 'ENOENT') return sendText(response, 404, 'Not found');
     throw error;
@@ -193,30 +208,28 @@ function positiveInteger(value, fallback) {
   return Number.isInteger(number) && number > 0 ? number : fallback;
 }
 
+function boundedEnvironmentInteger(value, fallback, minimum, maximum) {
+  return value === undefined ? fallback : boundedInteger(Number(value), minimum, maximum, '环境变量');
+}
+
 function boundedInteger(value, minimum, maximum, name) {
   if (!Number.isInteger(value) || value < minimum || value > maximum) throw badRequest(`${name} 必须在 ${minimum}–${maximum} 之间。`);
   return value;
 }
 
-function boundedText(value, minimum, maximum, name) {
-  if (typeof value !== 'string') throw badRequest(`${name} 必须是文字。`);
-  const text = value.trim();
-  if (text.length < minimum || text.length > maximum) throw badRequest(`${name} 长度必须在 ${minimum}–${maximum} 之间。`);
-  return text;
-}
-
-function safeImageUrl(value, name) {
-  const text = boundedText(value, 1, 2048, name);
-  if (text.startsWith('/assets/')) return text;
-  try {
-    const url = new URL(text);
-    if (url.protocol === 'https:') return url.href;
-  } catch { /* 统一返回请求参数错误。 */ }
-  throw badRequest(`${name} 必须是 HTTPS 图片地址或站内 assets 地址。`);
+function boundedBase64Url(value, minimum, maximum, name) {
+  if (typeof value !== 'string' || value.length < minimum || value.length > maximum || !/^[A-Za-z0-9_-]+$/.test(value)) throw badRequest(`${name} 格式无效。`);
+  return value;
 }
 
 function badRequest(message) {
   const error = new Error(message);
   error.statusCode = 400;
+  return error;
+}
+
+function tooManyRequests(message) {
+  const error = new Error(message);
+  error.statusCode = 429;
   return error;
 }
