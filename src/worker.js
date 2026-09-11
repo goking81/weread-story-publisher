@@ -71,12 +71,34 @@ async function revokeStory(request, env, slug) {
 }
 
 async function storyPage(request, env) {
+  const slug = new URL(request.url).pathname.split('/').pop();
+  const story = await readStory(env, slug);
   const assetUrl = new URL('/', request.url);
   const response = await env.ASSETS.fetch(new Request(assetUrl, request));
   const headers = new Headers(response.headers);
   headers.set('Cache-Control', 'no-cache');
   headers.set('Referrer-Policy', 'no-referrer');
-  return new Response(response.body, { status: response.status, headers });
+  if (!story?.share) return new Response(response.body, { status: response.status, headers });
+
+  const pageUrl = new URL(request.url);
+  pageUrl.hash = '';
+  const imageUrl = new URL(story.share.imageUrl, pageUrl.origin).href;
+  const rewritten = new HTMLRewriter()
+    .on('title', textHandler(story.share.title))
+    .on('#share-description', attributeHandler('content', story.share.description))
+    .on('#share-og-title', attributeHandler('content', story.share.title))
+    .on('#share-og-description', attributeHandler('content', story.share.description))
+    .on('#share-og-image', attributeHandler('content', imageUrl))
+    .on('#share-og-url', attributeHandler('content', pageUrl.href))
+    .on('#share-item-name', attributeHandler('content', story.share.title))
+    .on('#share-item-description', attributeHandler('content', story.share.description))
+    .on('#share-item-image', attributeHandler('content', imageUrl))
+    .on('#share-image-src', attributeHandler('href', imageUrl))
+    .on('#share-twitter-title', attributeHandler('content', story.share.title))
+    .on('#share-twitter-description', attributeHandler('content', story.share.description))
+    .on('#share-twitter-image', attributeHandler('content', imageUrl))
+    .transform(response);
+  return new Response(rewritten.body, { status: rewritten.status, headers });
 }
 
 async function readStory(env, slug) {
@@ -92,7 +114,7 @@ async function readStory(env, slug) {
 
 function normalizeEnvelope(payload, configuredDefault) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw badRequest('请求体必须是加密信封。');
-  const allowedKeys = new Set(['envelope', 'revokeHash', 'expiresInDays']);
+  const allowedKeys = new Set(['envelope', 'revokeHash', 'expiresInDays', 'share']);
   if (Object.keys(payload).some(key => !allowedKeys.has(key))) throw badRequest('发布接口不接收明文阅读数据。');
   const envelope = payload.envelope;
   if (!envelope || typeof envelope !== 'object' || envelope.version !== 1) throw badRequest('无效的加密信封版本。');
@@ -105,12 +127,43 @@ function normalizeEnvelope(payload, configuredDefault) {
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + expiresInDays * 86400000).toISOString(),
     revokeHash: boundedBase64Url(payload.revokeHash, 43, 43, 'revokeHash'),
+    share: normalizeShare(payload.share),
     envelope: {
       version: 1,
       iv: boundedBase64Url(envelope.iv, 16, 32, 'envelope.iv'),
       ciphertext: boundedBase64Url(envelope.ciphertext, 1, 86000, 'envelope.ciphertext')
     }
   };
+}
+
+function normalizeShare(share) {
+  if (share === undefined) return null;
+  if (!share || typeof share !== 'object' || Array.isArray(share)) throw badRequest('share 格式无效。');
+  const allowedKeys = new Set(['title', 'description', 'imageUrl']);
+  if (Object.keys(share).some(key => !allowedKeys.has(key))) throw badRequest('share 包含未知字段。');
+  const title = boundedText(share.title, 8, 60, 'share.title');
+  const description = boundedText(share.description, 1, 120, 'share.description');
+  const imageUrl = boundedText(share.imageUrl, 1, 2000, 'share.imageUrl');
+  let parsed;
+  try { parsed = new URL(imageUrl, 'https://share.invalid'); }
+  catch { throw badRequest('share.imageUrl 格式无效。'); }
+  if (parsed.protocol !== 'https:' || (!imageUrl.startsWith('/') && parsed.origin === 'https://share.invalid')) throw badRequest('share.imageUrl 必须是 HTTPS 地址或站内绝对路径。');
+  return { title, description, imageUrl };
+}
+
+function boundedText(value, minimum, maximum, name) {
+  if (typeof value !== 'string') throw badRequest(`${name} 格式无效。`);
+  const text = value.trim();
+  if (text.length < minimum || text.length > maximum || /[\u0000-\u001f\u007f]/.test(text)) throw badRequest(`${name} 长度或字符无效。`);
+  return text;
+}
+
+function attributeHandler(name, value) {
+  return { element(element) { element.setAttribute(name, value); } };
+}
+
+function textHandler(value) {
+  return { element(element) { element.setInnerContent(value); } };
 }
 
 async function assertWithinPublishLimit(request, env) {

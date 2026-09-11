@@ -13,6 +13,9 @@ if (!payloadPath || !baseUrl || !inviteCode) {
 }
 
 const story = JSON.parse(await readFile(payloadPath, 'utf8'));
+const totalHours = Math.floor(story.report.totalMinutes / 60);
+const totalMinutes = story.report.totalMinutes % 60;
+const primaryTopic = story.report.topics[0] || '阅读';
 const key = randomBytes(32);
 // 撤销凭据独立生成，拿到分享链接的读者不能删除报告。
 const revokeToken = randomBytes(32).toString('base64url');
@@ -22,6 +25,11 @@ const ciphertext = await webcrypto.subtle.encrypt({ name: 'AES-GCM', iv }, crypt
 const payload = {
   envelope: { version: 1, iv: iv.toString('base64url'), ciphertext: Buffer.from(ciphertext).toString('base64url') },
   revokeHash: createHash('sha256').update(revokeToken).digest('base64url'),
+  share: story.share || {
+    title: `${story.report.year}，我一直在往${primaryTopic}深处走`,
+    description: `${totalHours}小时${totalMinutes}分，${story.report.focusPercent}%的阅读时间留给了同一套书`,
+    imageUrl: story.report.topBook.coverUrl
+  },
   expiresInDays: story.expiresInDays
 };
 const response = await fetch(`${baseUrl}/api/stories`, {

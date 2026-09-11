@@ -12,6 +12,7 @@ Publish only after the user has approved public sharing. Keep the raw report on 
 - Verify `year`, `focusPercent`, `totalMinutes`, `booksRead`, the top book title/minutes/cover, and 1–4 topics against the authorized source.
 - Default identity mode to `name_avatar`; honor explicit `name` or `anonymous` choices. Do not include WeChat IDs, WeRead IDs, raw notes, or the full reading-history export.
 - Use a direct HTTPS book-cover image or a same-origin authorized asset. Never use a screenshot of a reader/store page as a cover.
+- The share-card title, short description, and image URL are intentionally public so WeChat can read them without the fragment key. Tell the user this narrow exception; keep the full report encrypted.
 - Keep the fixed six-screen narrative intact unless the user explicitly asks to change the product logic.
 
 Create a minimal UTF-8 JSON payload:
@@ -44,6 +45,8 @@ node <skill-directory>/scripts/publish-story.mjs <payload-file>
 The command returns paths, not the secret link itself. Hand the generated QR image to the user and keep the `.url` link private. The `.revoke.json` file is a separate management credential; do not send it to viewers. The default lifetime is 30 days, and `expiresInDays` should only differ when the user explicitly requests it.
 
 Explain that scanning the QR opens the animated mobile Story. The user performs the final WeChat/Moments share. Do not claim that a share succeeded until the user verifies it on a real phone.
+
+The publisher derives a stronger first-person share title from the year and primary topic, plus a short numerical description and the hero-book cover. A caller may provide a reviewed `share` object to override those three public fields.
 
 ## Revoke
 
