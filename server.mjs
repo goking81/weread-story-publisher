@@ -13,14 +13,11 @@ const defaultExpiryDays = boundedEnvironmentInteger(process.env.DEFAULT_EXPIRY_D
 const maxPublishesPerHour = boundedEnvironmentInteger(process.env.PUBLISH_MAX_PUBLISHES_PER_HOUR, 5, 1, 100);
 const publishLimits = new Map();
 const staticFiles = new Map([
-  ['/', 'index.html'],
-  ['/index.html', 'index.html'],
-  ['/story.css', 'story.css'],
-  ['/story.js', 'story.js'],
-  ['/qrcode.mjs', 'node_modules/qrcode-generator/dist/qrcode.mjs'],
-  ['/s/story.css', 'story.css'],
-  ['/s/story.js', 'story.js'],
-  ['/s/qrcode.mjs', 'node_modules/qrcode-generator/dist/qrcode.mjs']
+  ['/', 'public/index.html'],
+  ['/index.html', 'public/index.html'],
+  ['/story.css', 'public/story.css'],
+  ['/story.js', 'public/story.js'],
+  ['/qrcode.mjs', 'public/qrcode.mjs']
 ]);
 const mimeTypes = { '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.jpg': 'image/jpeg', '.png': 'image/png' };
 let stories = await loadStories();
@@ -52,11 +49,11 @@ async function route(request, response) {
   const publicMatch = pathname.match(/^\/s\/([A-Za-z0-9_-]{12,})$/);
   if (request.method === 'GET' && publicMatch) {
     if (!findActiveStory(publicMatch[1])) return sendText(response, 404, '这份阅读故事已失效或不存在。');
-    return sendFile(response, 'index.html');
+    return sendFile(response, 'public/index.html');
   }
 
   const assetMatch = pathname.match(/^\/(?:s\/)?assets\/([A-Za-z0-9._-]+)$/);
-  if (request.method === 'GET' && assetMatch) return sendFile(response, join('assets', assetMatch[1]));
+  if (request.method === 'GET' && assetMatch) return sendFile(response, join('public', 'assets', assetMatch[1]));
   if (request.method === 'GET' && staticFiles.has(pathname)) return sendFile(response, staticFiles.get(pathname));
   sendText(response, 404, 'Not found');
 }

@@ -14,12 +14,14 @@ if (!payloadPath || !baseUrl || !inviteCode) {
 
 const story = JSON.parse(await readFile(payloadPath, 'utf8'));
 const key = randomBytes(32);
+// 撤销凭据独立生成，拿到分享链接的读者不能删除报告。
+const revokeToken = randomBytes(32).toString('base64url');
 const iv = randomBytes(12);
 const cryptoKey = await webcrypto.subtle.importKey('raw', key, { name: 'AES-GCM' }, false, ['encrypt']);
 const ciphertext = await webcrypto.subtle.encrypt({ name: 'AES-GCM', iv }, cryptoKey, Buffer.from(JSON.stringify(story), 'utf8'));
 const payload = {
   envelope: { version: 1, iv: iv.toString('base64url'), ciphertext: Buffer.from(ciphertext).toString('base64url') },
-  revokeHash: createHash('sha256').update(key).digest('base64url'),
+  revokeHash: createHash('sha256').update(revokeToken).digest('base64url'),
   expiresInDays: story.expiresInDays
 };
 const response = await fetch(`${baseUrl}/api/stories`, {
@@ -33,6 +35,8 @@ if (!response.ok) throw new Error(result.error || '发布失败。');
 const url = `${result.url}#${key.toString('base64url')}`;
 const qrPath = process.env.WEREAD_STORY_QR_PATH || join(dirname(payloadPath), `${basename(payloadPath, extname(payloadPath))}.qr.png`);
 const urlFile = process.env.WEREAD_STORY_URL_OUTPUT || join(tmpdir(), `weread-story-${result.slug}.url`);
-await QRCode.toFile(qrPath, url, { width: 420, margin: 2, errorCorrectionLevel: 'M' });
+const revokeFile = `${urlFile}.revoke.json`;
+await writeFile(revokeFile, JSON.stringify({ url: result.url, credential: payload.revokeHash }), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
 await writeFile(urlFile, url, { encoding: 'utf8', mode: 0o600 });
-console.log(JSON.stringify({ slug: result.slug, expiresAt: result.expiresAt, qrPath, urlFile }, null, 2));
+await QRCode.toFile(qrPath, url, { width: 420, margin: 4, errorCorrectionLevel: 'M' });
+console.log(JSON.stringify({ slug: result.slug, expiresAt: result.expiresAt, qrPath, urlFile, revokeFile }, null, 2));

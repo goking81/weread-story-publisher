@@ -1,0 +1,41 @@
+{
+  "$schema": "./node_modules/wrangler/config-schema.json",
+  "name": "weread-story-publisher",
+  "main": "./src/worker.js",
+  "compatibility_date": "2026-09-10",
+  "workers_dev": true,
+  "routes": [{ "pattern": "readstory.learnbox.cc", "custom_domain": true }],
+  "kv_namespaces": [
+    {
+      "binding": "WEREAD_STORIES",
+      "id": "dae79f0f7d704be4886456edd06109eb"
+    }
+  ],
+  "durable_objects": {
+    "bindings": [
+      {
+        "name": "PUBLISH_RATE_LIMITER",
+        "class_name": "PublishRateLimiter"
+      }
+    ]
+  },
+  "migrations": [
+    {
+      "tag": "v1",
+      "new_sqlite_classes": ["PublishRateLimiter"]
+    }
+  ],
+  "assets": {
+    "directory": "./public",
+    "binding": "ASSETS",
+    "run_worker_first": true
+  },
+  "vars": {
+    "DEFAULT_EXPIRY_DAYS": 30,
+    "PUBLISH_MAX_PUBLISHES_PER_HOUR": 5
+  },
+  "observability": {
+    "enabled": true,
+    "head_sampling_rate": 0.1
+  }
+}

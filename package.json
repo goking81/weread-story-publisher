@@ -7,10 +7,16 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
     "dev": "node --watch --env-file-if-exists=.env server.mjs",
-    "test": "node --test test/server.test.mjs"
+    "test": "node --test test/server.test.mjs test/worker.test.mjs",
+    "worker:dev": "wrangler dev",
+    "worker:check": "wrangler deploy --dry-run",
+    "worker:deploy": "wrangler deploy"
   },
   "dependencies": {
     "qrcode": "^1.5.4",
     "qrcode-generator": "^2.0.4"
+  },
+  "devDependencies": {
+    "wrangler": "^4.130.0"
   }
 }

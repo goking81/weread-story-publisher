@@ -1,14 +1,13 @@
-import { createHash } from 'node:crypto';
+import { readFile } from 'node:fs/promises';
 
-const [storyUrl] = process.argv.slice(2);
-if (!storyUrl) throw new Error('需要完整的加密分享链接。');
+const [revokeFile] = process.argv.slice(2);
+if (!revokeFile) throw new Error('需要发布时生成的本地 .revoke.json 管理文件。');
+const { url: storyUrl, credential } = JSON.parse(await readFile(revokeFile, 'utf8'));
 
 const url = new URL(storyUrl);
 const slug = url.pathname.match(/^\/s\/([A-Za-z0-9_-]{12,})$/)?.[1];
-const key = url.hash.slice(1);
-if (!slug || !key) throw new Error('链接缺少故事编号或加密密钥。');
+if (!slug || !/^[A-Za-z0-9_-]{43}$/.test(credential)) throw new Error('撤销文件格式无效。');
 
-const revokeHash = createHash('sha256').update(Buffer.from(key, 'base64url')).digest('base64url');
-const response = await fetch(`${url.origin}/api/stories/${slug}`, { method: 'DELETE', headers: { 'X-Story-Revoke': revokeHash } });
+const response = await fetch(`${url.origin}/api/stories/${slug}`, { method: 'DELETE', headers: { 'X-Story-Revoke': credential } });
 if (response.status === 204) console.log('已撤销这份阅读故事。');
 else throw new Error((await response.json()).error || '撤销失败。');

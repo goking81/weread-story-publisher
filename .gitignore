@@ -1,5 +1,15 @@
 node_modules/
 .npm-cache/
+.wrangler/
+.wrangler-config/
+.dev.vars
+.local-publish.json
+*.url
+*.revoke.json
+*.qr.png
+worker-configuration.d.ts
+public/assets/history-deep-republic-set-hd.jpg
+public/assets/history-deep-republic-weread.jpg
 .env
 data/
 npm-debug.log*

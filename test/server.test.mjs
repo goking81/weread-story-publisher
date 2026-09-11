@@ -60,8 +60,8 @@ test('只保存密文、浏览器可解密，并能撤销一份故事', async (c
   const page = await fetch(published.url);
   assert.equal(page.status, 200);
   assert.match(await page.text(), /story\.js/);
-  assert.equal((await fetch(`${baseUrl}/s/story.css`)).status, 200);
-  assert.equal((await fetch(`${baseUrl}/s/qrcode.mjs`)).status, 200);
+  assert.equal((await fetch(`${baseUrl}/story.css`)).status, 200);
+  assert.equal((await fetch(`${baseUrl}/qrcode.mjs`)).status, 200);
 
   const revoked = await fetch(`${baseUrl}/api/stories/${published.slug}`, { method: 'DELETE', headers: { 'X-Story-Revoke': revokeHash } });
   assert.equal(revoked.status, 204);

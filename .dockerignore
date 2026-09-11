@@ -2,3 +2,10 @@ node_modules
 .env
 data
 .git
+.wrangler-config
+.wrangler
+.npm-cache
+.dev.vars
+.local-publish.json
+*.url
+*.revoke.json

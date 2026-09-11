@@ -1,60 +1,73 @@
 # WeRead Story Publisher
 
-将一份经过确认的阅读统计发布为可在微信中打开、滑动并保留动效的移动端 H5。默认有效期为 30 天。阅读报告在本机用 AES-GCM 加密，服务端只保存临时密文、到期时间和撤销哈希；解密密钥只在分享链接的 `#` 片段中，由查看者的浏览器使用。
+把经过用户确认的微信读书年度统计，发布成可在手机和微信中打开、上下滑动并保留动效的 H5。线上地址为 `https://readstory.learnbox.cc`，每份故事默认保留 30 天。
 
-## 本地启动
+## 已实现
+
+- 6 屏移动端动态阅读故事与真实书封展示
+- 本机 AES-GCM 加密后发布；分享链接的 `#` 片段携带解密密钥
+- Cloudflare Worker、KV 临时存储、每 IP 每小时 5 次发布限制
+- 30 天到期、独立撤销凭据、二维码与私密链接文件
+- 三种署名方式：昵称与头像（默认）、仅昵称、匿名
+- 可安装的 Codex Skill：`skills/weread-story-publisher/`
+
+尚未接入微信读书 API、微信 JS-SDK 分享卡片和普通用户自助登录。当前 v0.1 由受控的邀请码保护发布接口。
+
+## 使用发布脚本
+
+准备一份与 `examples/sample-story.json` 同结构的 JSON，然后运行：
 
 ```powershell
-Copy-Item .env.example .env
-# 在 .env 中设置 PUBLIC_BASE_URL 与至少一个长且随机的 PUBLISH_INVITE_CODES
-npm install
+$env:WEREAD_STORY_PUBLISH_URL='https://readstory.learnbox.cc'
+$env:WEREAD_STORY_INVITE_CODE='<管理员提供的邀请码>'
+node skills/weread-story-publisher/scripts/publish-story.mjs examples/sample-story.json
+```
+
+脚本上传的只有密文，并生成三个本地文件：
+
+- `*.qr.png`：手机扫码打开动态故事
+- 系统临时目录中的 `*.url`：含解密密钥的完整分享链接
+- `*.url.revoke.json`：仅发布者保管的撤销凭据
+
+完整链接和撤销文件都不应进入 Git、日志、统计平台或公开文档。撤销时运行：
+
+```powershell
+node skills/weread-story-publisher/scripts/revoke-story.mjs '<本地 .revoke.json 文件路径>'
+```
+
+## 本地验证
+
+```powershell
+npm ci
 npm test
 npm start
 ```
 
-本地测试发布（原始 JSON 仅留在本机）：
+Cloudflare Worker 本地预览：
 
 ```powershell
-$env:WEREAD_STORY_PUBLISH_URL='http://localhost:3000'
-$env:WEREAD_STORY_INVITE_CODE='<PUBLISH_INVITE_CODES 中的一个邀请码>'
-node skills/weread-story-publisher/scripts/publish-story.mjs examples/sample-story.json
+npx wrangler dev
 ```
 
-命令只会上传加密信封，并会在本地输出一个二维码 PNG 和一个位于系统临时目录的 `urlFile`（完整 URL 不会直接打印到终端）。完整 URL 带有 `#` 后的解密密钥，任何拿到它的人均可查看故事；不要放到日志、统计平台或公开文档。要撤销，运行：
+## Cloudflare 部署
 
-```powershell
-node skills/weread-story-publisher/scripts/revoke-story.mjs '<完整 Story URL>'
-```
+项目使用 Worker 静态资源、KV 和 Durable Object，不需要购买服务器，也不依赖 Supabase。
 
-撤销会立即删除服务端密文。到期后，服务端也会自动删除。
+1. 创建名为 `WEREAD_STORIES` 的 KV，并把 ID 写入 `wrangler.jsonc`。
+2. 设置 Worker secrets：`PUBLISH_INVITE_CODES` 与 `RATE_LIMIT_SALT`。
+3. 运行 `npm test` 和 `npx wrangler deploy`，或在 Cloudflare 中连接本 GitHub 仓库。
+4. 将 Custom Domain 设为 `readstory.learnbox.cc`；Cloudflare 自动管理 DNS 和 HTTPS 证书。
 
-## 部署到自己的服务器
-
-1. 为域名配置 HTTPS，并把 `PUBLIC_BASE_URL` 设为最终的 `https://` 地址，例如 `https://readstory.learnbox.cc`。
-2. 将 `.env` 和 `data/` 放在服务器的持久磁盘，不要上传到 GitHub。
-3. 在反向代理中把全部请求转发给本服务；保留 `Host` 和 `X-Forwarded-Proto` 请求头。
-4. 将 `PUBLISH_INVITE_CODES` 只放在服务器和调用 Skill 的受控环境，绝不放进浏览器代码或 Git。
-
-Docker 部署：
-
-```bash
-docker build -t weread-story-publisher .
-docker run --env-file .env -v /srv/weread-story/data:/app/data -p 3000:3000 weread-story-publisher
-```
-
-## Skill
-
-`skills/weread-story-publisher/` 是可随仓库发布的 Codex Skill。它只在用户明确同意公开分享、且阅读数据已核对后调用发布 API。发布脚本在本地加密，服务端接口拒绝包含明文字段的请求。
-
-ChatGPT 网页端若要直接触发这个 Skill，还需要把发布 API 通过已授权的 MCP/应用工具暴露给网页端；仅把 `SKILL.md` 推到 GitHub 不会自动授予 ChatGPT 对你服务器的调用权限。
+`scripts/configure-secrets.mjs` 仅供站点管理员初始化或轮换 secrets；它会把值保存到已被 Git 忽略的 `.local-publish.json`，不会打印密钥。
 
 ## 隐私边界
 
-- 服务端能看到发布时间、到期时间、密文大小、访问 IP 与用户代理，不能从保存内容中读取书名、时长、昵称或头像。
-- 链接片段在标准浏览器请求中不会发送给服务端；页面额外设置了 `Referrer-Policy: no-referrer`。但得到完整链接的人仍可查看故事，因此它相当于一张可撤销的“持有即访问”门票。
-- 若故事使用远程书封，查看者的浏览器会在解密后请求该图片提供方；生产环境建议把获授权的封面转存到自己的 HTTPS 静态资源域。
+- 当前实现上传并保存的是密文。常规请求中，服务端看不到链接 `#` 后的密钥，因此不能直接从 KV 里的内容读出昵称、书名、时长或头像。
+- 站点仍能看到访问 IP、时间、密文大小和浏览器信息；完整分享链接持有者也能查看故事。
+- 这不是经过独立审计的“零知识”系统：站点运营者控制前端代码，若前端被恶意修改或站点被攻破，理论上仍可能泄露解密后的数据。敏感笔记、微信 ID、完整阅读历史均不应放入故事。
+- 到期或撤销会删除云端密文，但 Cloudflare KV 的边缘缓存可能短暂延迟；接收者已经保存的内容无法远程收回。
+- 远程头像或书封会让图片提供方收到图片请求。正式版宜使用获授权、同域托管的封面资源。
 
-## 当前边界
+## Skill 的作用范围
 
-- 已实现：本地加密发布、公开读取与浏览器解密、本地二维码、默认 30 天失效、手动撤销、v0.1 邀请码门槛和移动端动态页面。
-- 尚未接入：微信读书真实数据抓取、微信 JS-SDK 分享卡片配置、用户登录和多服务器数据库。
+Skill 负责校验最小数据、按用户选择处理署名、本机加密、发布、生成二维码和撤销文件。它不会自行绕过微信读书授权，也不会把邀请码或完整分享链接提交到 GitHub。ChatGPT 网页端若要直接调用，还需要一个已授权的本地工具或 MCP 执行这些脚本。

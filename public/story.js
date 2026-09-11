@@ -1,4 +1,4 @@
-import qrcode from './qrcode.mjs';
+import qrcode from '/qrcode.mjs';
 
 const pages = document.querySelectorAll('.page');
 const capture = Number(new URLSearchParams(location.search).get('slide'));
@@ -31,8 +31,8 @@ async function loadPublishedStory(slug) {
     if (!key) throw new Error('这份阅读故事需要完整的加密分享链接。');
     const response = await fetch(`/api/stories/${slug}`);
     if (!response.ok) throw new Error('这份阅读故事已失效或不存在。');
-    const { envelope } = await response.json();
-    renderStory(await decryptStory(envelope, key));
+    const { envelope, expiresAt } = await response.json();
+    renderStory(await decryptStory(envelope, key), expiresAt);
   } catch (error) {
     showUnavailable(error.message || '这份阅读故事无法打开。');
   }
@@ -46,7 +46,7 @@ async function decryptStory(envelope, key) {
   return JSON.parse(new TextDecoder().decode(plaintext));
 }
 
-function renderStory(story) {
+function renderStory(story, expiresAt) {
   const { report, identity } = story;
   const set = (name, value) => document.querySelectorAll(`[data-story="${name}"]`).forEach(node => node.textContent = String(value));
   const totalHours = Math.floor(report.totalMinutes / 60);
@@ -69,24 +69,25 @@ function renderStory(story) {
   topicLine.replaceChildren(...report.topics.slice(0, 3).flatMap((topic, index) => index ? [document.createElement('br'), document.createTextNode(topic)] : [document.createTextNode(topic)]));
   applyIdentity(identity);
   document.querySelector('#identityOptions').hidden = true;
-  identityNote.textContent = `本次发布署名：${identityLabel(identity.mode)}。内容已加密，将在 30 天后自动删除。`;
-  renderShareCode();
+  const expiry = new Date(expiresAt).toLocaleString('zh-CN', { hour12: false });
+  identityNote.textContent = `本次发布署名：${identityLabel(identity.mode)}。有效期至 ${expiry}。`;
+  renderShareCode(expiry);
   document.title = `${report.year} 阅读故事`;
 }
 
-function renderShareCode() {
+function renderShareCode(expiry) {
   const qr = document.querySelector('#storyQr');
   const storyLink = document.querySelector('#storyLink');
   qr.hidden = true;
   storyLink.replaceChildren(
-    document.createTextNode('这份链接已端到端加密 · 30 天后自动失效'),
+    document.createTextNode(`加密阅读故事 · ${expiry} 到期`),
     document.createElement('br'),
     Object.assign(document.createElement('small'), { textContent: '请在微信右上角转发给朋友。' })
   );
   const code = qrcode(0, 'M');
   code.addData(location.href, 'Byte');
   code.make();
-  qr.src = code.createDataURL(4, 4);
+  qr.src = code.createDataURL(4, 16);
   qr.alt = '阅读故事二维码';
   qr.hidden = false;
 }

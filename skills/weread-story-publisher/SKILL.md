@@ -1,32 +1,60 @@
 ---
 name: weread-story-publisher
-description: Publish an end-to-end encrypted, mobile WeRead Story link from verified reading statistics. Use after the user has approved public sharing and selected a privacy mode.
+description: Publish an encrypted, animated mobile WeRead annual story from verified reading statistics. Use when a user asks to generate, publish, QR-share, or revoke a WeRead Story.
 ---
 
 # WeRead Story Publisher
 
-Create a public mobile Story only from verified reading data and an explicit user choice to publish. The raw report remains on the user's machine: it is encrypted locally before upload and decrypts only in the viewing browser.
+Publish only after the user has approved public sharing. Keep the raw report on the local machine: the bundled script encrypts it before upload and creates a QR code for the animated H5.
 
-## Before publishing
+## Validate before publishing
 
-- Confirm the report year, reading duration, book count, hero book, and topics from the data source.
-- Ask for a publish decision if the user has not already made one. The default identity mode is `name_avatar`; allow `name` and `anonymous`.
-- Never include a WeChat ID, WeRead user ID, raw notes, or a full reading-history export in the Story payload.
-- Use an HTTPS cover image URL from the book source when available. Do not send screenshots of a storefront or reader UI as a book cover.
-- Treat the final Story URL as a secret: its `#...` fragment contains the decryption key. Do not put that URL in analytics, issue trackers, terminal transcripts, or a public document.
+- Verify `year`, `focusPercent`, `totalMinutes`, `booksRead`, the top book title/minutes/cover, and 1–4 topics against the authorized source.
+- Default identity mode to `name_avatar`; honor explicit `name` or `anonymous` choices. Do not include WeChat IDs, WeRead IDs, raw notes, or the full reading-history export.
+- Use a direct HTTPS book-cover image or a same-origin authorized asset. Never use a screenshot of a reader/store page as a cover.
+- Keep the fixed six-screen narrative intact unless the user explicitly asks to change the product logic.
+
+Create a minimal UTF-8 JSON payload:
+
+```json
+{
+  "identity": { "mode": "name_avatar", "nickname": "阅读者", "avatarUrl": "https://example.com/avatar.jpg" },
+  "report": {
+    "year": 2026,
+    "focusPercent": 71,
+    "totalMinutes": 2096,
+    "booksRead": 9,
+    "topBook": { "title": "历史深处的民国（全集）", "minutes": 1482, "coverUrl": "https://example.com/cover.jpg" },
+    "topics": ["历史", "人物传记", "年代小说", "文学"]
+  },
+  "expiresInDays": 30
+}
+```
 
 ## Publish
 
-The service URL and v0.1 beta invite code are supplied through `WEREAD_STORY_PUBLISH_URL` and `WEREAD_STORY_INVITE_CODE`. The default life span is 30 days; set `expiresInDays` only when the user explicitly requests a different duration.
+The administrator supplies `WEREAD_STORY_PUBLISH_URL` and `WEREAD_STORY_INVITE_CODE` in the controlled execution environment. Never print or persist the invite code.
 
-1. Write a minimal JSON payload matching `examples/sample-story.json`.
-2. Run `node skills/weread-story-publisher/scripts/publish-story.mjs <payload-file>`.
-3. The script creates a local QR image and writes the full Story URL to a temporary `urlFile` rather than printing it. Read that file only in the controlled local session, then relay the link privately to the user. Explain that opening it in WeChat preserves the H5 motion; the user still chooses the final Moments post.
+Run:
 
-The publisher encrypts the complete payload using AES-GCM locally. The service receives only a ciphertext envelope, an expiry timestamp, and a one-way revocation hash. The key is appended after `#` in the final URL, so browsers do not send it to the service.
+```text
+node <skill-directory>/scripts/publish-story.mjs <payload-file>
+```
+
+The command returns paths, not the secret link itself. Hand the generated QR image to the user and keep the `.url` link private. The `.revoke.json` file is a separate management credential; do not send it to viewers. The default lifetime is 30 days, and `expiresInDays` should only differ when the user explicitly requests it.
+
+Explain that scanning the QR opens the animated mobile Story. The user performs the final WeChat/Moments share. Do not claim that a share succeeded until the user verifies it on a real phone.
 
 ## Revoke
 
-When the user asks to remove a published story, run `node skills/weread-story-publisher/scripts/revoke-story.mjs <full-story-url>`. Confirm only after the endpoint returns success. The local revoke script derives the credential from the URL fragment; do not send the full URL anywhere else.
+When the publisher asks to remove a Story, run:
 
-The bundled publisher only talks to the configured service. It must not print or save the invite code, raw report, or final secret URL in a project file.
+```text
+node <skill-directory>/scripts/revoke-story.mjs <local-.revoke.json-path>
+```
+
+Confirm revocation only after the endpoint returns success. Deletion can take a short time to propagate through Cloudflare KV caches, and already saved copies cannot be recalled.
+
+## Privacy wording
+
+Say precisely that the current service stores ciphertext and normally does not receive the fragment key. Do not promise absolute privacy or audited zero knowledge: the site operator controls the JavaScript delivered to browsers, and access metadata remains visible to the hosting platform.
