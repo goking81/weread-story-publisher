@@ -1,6 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { pathToFileURL } from 'node:url';
+import { loadConfiguration } from './config.mjs';
 
 const API_URL = 'https://i.weread.qq.com/api/agent/gateway';
 const WEREAD_SKILL_VERSION = '1.0.4';
@@ -60,8 +61,7 @@ async function main() {
     console.log('用法：node prepare-story.mjs [--year 2026] [--identity anonymous|name|name_avatar] [--nickname 昵称] [--avatar-url https://...] [--output story.json]');
     return;
   }
-  const apiKey = process.env.WEREAD_API_KEY;
-  if (!apiKey) throw new Error('未设置 WEREAD_API_KEY。请先在本机环境变量中配置微信读书 API Key。');
+  const { apiKey } = await loadConfiguration();
 
   const currentYear = Number(new Intl.DateTimeFormat('en', { timeZone: 'Asia/Shanghai', year: 'numeric' }).format(new Date()));
   const year = options.year === undefined ? currentYear : Number(options.year);

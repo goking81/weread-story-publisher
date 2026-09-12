@@ -3,12 +3,13 @@ import { readFile, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { basename, dirname, extname, join } from 'node:path';
 import QRCode from 'qrcode';
+import { loadConfiguration } from './config.mjs';
 
 const [payloadPath] = process.argv.slice(2);
-const baseUrl = process.env.WEREAD_STORY_PUBLISH_URL?.replace(/\/$/, '');
+const { publishUrl: baseUrl } = await loadConfiguration();
 
-if (!payloadPath || !baseUrl) {
-  throw new Error('需要 payload 文件和 WEREAD_STORY_PUBLISH_URL。');
+if (!payloadPath) {
+  throw new Error('需要 payload 文件。');
 }
 
 const story = JSON.parse(await readFile(payloadPath, 'utf8'));

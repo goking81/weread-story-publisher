@@ -11,9 +11,17 @@ Read the user's authorized annual statistics, prepare the fixed six-screen Story
 
 This is a portable local Skill: the required runtime is Node.js 18+ plus the files in this directory. Codex-only UI metadata lives in `agents/openai.yaml` and is optional. Other agents should import the directory or a package containing `SKILL.md`, `scripts/`, `package.json`, and `package-lock.json`; do not copy API keys, generated reports, QR images, or revoke credentials into the package.
 
-## First use
+## First use: local configuration page
 
-The local environment needs Node.js 18+, `WEREAD_API_KEY`, and `WEREAD_STORY_PUBLISH_URL`. Never place the API key in source files or chat output.
+The local environment needs Node.js 18+. On the first request, guide the user to start the local setup page:
+
+```text
+node <skill-directory>/scripts/setup.mjs
+```
+
+It prints a `http://127.0.0.1:<port>` URL. The user opens that local page and enters their own WeRead API Key there. The page saves it only in the user's local configuration directory; it never sends the key to this Skill's publisher or to chat. Do not ask the user to paste a Key into conversation, terminal output, or a remote web page. Use `setup.mjs --status` to check whether the local configuration is ready without exposing the Key.
+
+`WEREAD_API_KEY` and `WEREAD_STORY_PUBLISH_URL` remain optional environment-variable overrides for advanced users and managed Agent hosts. The default publisher is `https://readstory.learnbox.cc`.
 
 Install the Skill's one runtime dependency once when `node_modules` is absent:
 
@@ -21,7 +29,7 @@ Install the Skill's one runtime dependency once when `node_modules` is absent:
 npm ci --omit=dev --prefix <skill-directory>
 ```
 
-If the API key is absent, stop and ask the user to configure it locally. Do not ask them to paste it into chat.
+If the API key is absent, stop and direct the user to the local setup page. Do not ask them to paste it into chat.
 
 ## Prepare from WeRead
 

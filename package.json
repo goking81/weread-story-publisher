@@ -1,13 +1,13 @@
 {
   "name": "weread-story-publisher",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "private": true,
   "description": "Publish tokenized, mobile reading-story links from verified reading data.",
   "type": "module",
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
     "dev": "node --watch --env-file-if-exists=.env server.mjs",
-    "test": "node --test test/prepare-story.test.mjs test/server.test.mjs test/worker.test.mjs",
+    "test": "node --test test/prepare-story.test.mjs test/server.test.mjs test/worker.test.mjs test/skill-config.test.mjs",
     "worker:dev": "wrangler dev",
     "worker:check": "wrangler deploy --dry-run",
     "worker:deploy": "wrangler deploy"
