@@ -7,21 +7,51 @@
 - 6 屏移动端动态阅读故事与真实书封展示
 - 本机 AES-GCM 加密后发布；分享链接的 `#` 片段携带解密密钥
 - 为微信卡片单独提供公开的标题、短摘要和封面地址；完整报告仍为密文
+- Skill 可通过用户自己的 `WEREAD_API_KEY` 读取年度统计并生成待确认报告
 - Cloudflare Worker、KV 临时存储、每 IP 每小时 5 次发布限制
 - 30 天到期、独立撤销凭据、二维码与私密链接文件
 - 三种署名方式：昵称与头像（默认）、仅昵称、匿名
 - 可安装的 Codex Skill：`skills/weread-story-publisher/`
 
-尚未接入微信读书 API、微信 JS-SDK 分享卡片和普通用户自助登录。当前 v0.1 由受控的邀请码保护发布接口。
+尚未接入微信 JS-SDK 和普通用户自助登录。当前 v0.1 是公开源码、受控发布的测试版：读取使用用户自己的微信读书 API Key，发布到共享站点仍需管理员邀请码。
+
+## 安装 Skill
+
+把仓库中的 `skills/weread-story-publisher` 复制到本机 Codex skills 目录，然后安装二维码依赖：
+
+```powershell
+git clone https://github.com/goking81/weread-story-publisher.git
+Copy-Item -Recurse -Force weread-story-publisher/skills/weread-story-publisher "$env:USERPROFILE/.codex/skills/weread-story-publisher"
+npm ci --omit=dev --prefix "$env:USERPROFILE/.codex/skills/weread-story-publisher"
+```
+
+在本机设置微信读书 API Key，不要把它粘贴到聊天、提交到 Git 或写进 Skill：
+
+```powershell
+$env:WEREAD_API_KEY='<你的 API Key>'
+```
+
+调用 `$weread-story-publisher` 后，Agent 会先读取年度统计并展示将要公开的摘要；只有用户确认后才发布。
+
+## 从真实年度数据生成
+
+```powershell
+node skills/weread-story-publisher/scripts/prepare-story.mjs `
+  --year 2026 `
+  --identity anonymous `
+  --output weread-story-2026.json
+```
+
+可选署名方式为 `name_avatar`、`name` 或 `anonymous`。生成阶段只写本地 JSON，不会上传；完整年度原始回包也不会写入文件。
 
 ## 使用发布脚本
 
-准备一份与 `examples/sample-story.json` 同结构的 JSON，然后运行：
+确认生成的 JSON 内容后，再运行：
 
 ```powershell
 $env:WEREAD_STORY_PUBLISH_URL='https://readstory.learnbox.cc'
 $env:WEREAD_STORY_INVITE_CODE='<管理员提供的邀请码>'
-node skills/weread-story-publisher/scripts/publish-story.mjs examples/sample-story.json
+node skills/weread-story-publisher/scripts/publish-story.mjs weread-story-2026.json
 ```
 
 脚本上传的只有密文，并生成三个本地文件：
@@ -64,6 +94,7 @@ npx wrangler dev
 ## 隐私边界
 
 - 当前实现上传并保存的是密文。常规请求中，服务端看不到链接 `#` 后的密钥，因此不能直接从 KV 里的内容读出昵称、书名、时长或头像。
+- `WEREAD_API_KEY` 只由本机生成脚本发送给微信读书接口，不会发送到 `readstory.learnbox.cc`。
 - 微信必须在解密前抓取卡片，因此分享标题、短摘要和封面地址会明文保存；它们应只包含用户已同意公开的最少信息。
 - 站点仍能看到访问 IP、时间、密文大小和浏览器信息；完整分享链接持有者也能查看故事。
 - 这不是经过独立审计的“零知识”系统：站点运营者控制前端代码，若前端被恶意修改或站点被攻破，理论上仍可能泄露解密后的数据。敏感笔记、微信 ID、完整阅读历史均不应放入故事。
@@ -72,4 +103,4 @@ npx wrangler dev
 
 ## Skill 的作用范围
 
-Skill 负责校验最小数据、按用户选择处理署名、本机加密、发布、生成二维码和撤销文件。它不会自行绕过微信读书授权，也不会把邀请码或完整分享链接提交到 GitHub。ChatGPT 网页端若要直接调用，还需要一个已授权的本地工具或 MCP 执行这些脚本。
+Skill 负责读取经过授权的年度统计、校验最小数据、按用户选择处理署名、本机加密、发布、生成二维码和撤销文件。它不会自行绕过微信读书授权，也不会把 API Key、邀请码或完整分享链接提交到 GitHub。ChatGPT 网页端若要直接调用，仍需要一个已授权的本地工具或 MCP 执行这些脚本。

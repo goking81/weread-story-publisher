@@ -1,11 +1,35 @@
 ---
 name: weread-story-publisher
-description: Publish an encrypted, animated mobile WeRead annual story from verified reading statistics. Use when a user asks to generate, publish, QR-share, or revoke a WeRead Story.
+description: Generate, publish, QR-share, or revoke an encrypted animated annual Story from a user's authorized WeRead statistics.
 ---
 
 # WeRead Story Publisher
 
-Publish only after the user has approved public sharing. Keep the raw report on the local machine: the bundled script encrypts it before upload and creates a QR code for the animated H5.
+Read the user's authorized annual statistics, prepare the fixed six-screen Story, and publish only after the user approves the exact summary and public share card. The scripts keep the API key and raw response local, encrypt the report before upload, and create a QR code for the animated H5.
+
+## First use
+
+The local environment needs Node.js 18+ and `WEREAD_API_KEY`. The shared publisher also requires `WEREAD_STORY_PUBLISH_URL` and an administrator-issued `WEREAD_STORY_INVITE_CODE`; never place either secret in source files or chat output.
+
+Install the Skill's one runtime dependency once when `node_modules` is absent:
+
+```text
+npm ci --omit=dev --prefix <skill-directory>
+```
+
+If the API key is absent, stop and ask the user to configure it locally. Do not ask them to paste it into chat.
+
+## Prepare from WeRead
+
+Ask for the report year and one identity choice: `昵称与头像` (recommended), `仅昵称`, or `匿名`. A remote avatar is public and its host can observe image requests, so obtain approval before using it. Then run one of:
+
+```text
+node <skill-directory>/scripts/prepare-story.mjs --year 2026 --identity anonymous --output <local-json>
+node <skill-directory>/scripts/prepare-story.mjs --year 2026 --identity name --nickname <name> --output <local-json>
+node <skill-directory>/scripts/prepare-story.mjs --year 2026 --identity name_avatar --nickname <name> --avatar-url <https-url> --output <local-json>
+```
+
+The script calls only the annual reading-statistics endpoint, treats all duration fields as seconds, selects the longest-ranked electronic book with a real cover, and derives the focus percentage. It does not read or upload notes, highlights, WeChat IDs, WeRead IDs, or the full reading history.
 
 ## Validate before publishing
 
@@ -15,7 +39,7 @@ Publish only after the user has approved public sharing. Keep the raw report on 
 - The share-card title, short description, and image URL are intentionally public so WeChat can read them without the fragment key. Tell the user this narrow exception; keep the full report encrypted.
 - Keep the fixed six-screen narrative intact unless the user explicitly asks to change the product logic.
 
-Create a minimal UTF-8 JSON payload:
+The prepared UTF-8 JSON has this shape:
 
 ```json
 {
@@ -28,13 +52,20 @@ Create a minimal UTF-8 JSON payload:
     "topBook": { "title": "历史深处的民国（全集）", "minutes": 1482, "coverUrl": "https://example.com/cover.jpg" },
     "topics": ["历史", "人物传记", "年代小说", "文学"]
   },
+  "share": {
+    "title": "2026，我一直在往历史深处走",
+    "description": "34小时56分，71%的阅读时间留给了同一本书",
+    "imageUrl": "https://example.com/cover.jpg"
+  },
   "expiresInDays": 30
 }
 ```
 
+Show the user the year, total reading duration, number of books, hero book and duration, focus percentage, topics, identity mode, and the public `share` title/description/image. Stop before publishing until they approve this summary.
+
 ## Publish
 
-The administrator supplies `WEREAD_STORY_PUBLISH_URL` and `WEREAD_STORY_INVITE_CODE` in the controlled execution environment. Never print or persist the invite code.
+The administrator supplies `WEREAD_STORY_PUBLISH_URL` and `WEREAD_STORY_INVITE_CODE` in the controlled execution environment. Never print or persist the invite code. This v0.1 is a controlled beta: public source does not imply unrestricted access to the shared publisher.
 
 Run:
 

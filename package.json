@@ -7,7 +7,7 @@
   "scripts": {
     "start": "node --env-file-if-exists=.env server.mjs",
     "dev": "node --watch --env-file-if-exists=.env server.mjs",
-    "test": "node --test test/server.test.mjs test/worker.test.mjs",
+    "test": "node --test test/prepare-story.test.mjs test/server.test.mjs test/worker.test.mjs",
     "worker:dev": "wrangler dev",
     "worker:check": "wrangler deploy --dry-run",
     "worker:deploy": "wrangler deploy"

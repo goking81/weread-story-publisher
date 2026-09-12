@@ -1,0 +1,8 @@
+interface:
+  display_name: "微信读书动态年报"
+  short_description: "读取年度统计，安全生成加密动态故事与微信分享二维码"
+  brand_color: "#15223D"
+  default_prompt: "使用 $weread-story-publisher 读取我的微信读书年度统计，先让我确认内容，再生成并发布动态阅读故事。"
+
+policy:
+  allow_implicit_invocation: true
