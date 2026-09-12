@@ -15,7 +15,15 @@
 
 尚未接入微信 JS-SDK 和普通用户自助登录。当前 v0.1 已开放公共发布：读取使用用户自己的微信读书 API Key，任何用户都可将经确认的密文 Story 发布到共享站点。
 
+根地址 `https://readstory.learnbox.cc/` 不承载演示或任何用户故事，并返回不可用页面。只有发布脚本返回的 `/s/<随机编号>#<本地解密密钥>` 完整链接能展示动态 Story；随机编号本身不足以解密报告。
+
 ## 安装 Skill
+
+### WorkBuddy 与其他 Agent
+
+核心包并不依赖 Codex：`SKILL.md`、`scripts/`、`package.json` 和 `package-lock.json` 都是通用文件。WorkBuddy 支持上传本地技能包，因此可导入这四部分组成的 ZIP，再由 Agent 在本机执行 `npm ci --omit=dev --prefix <skill-directory>`。`agents/openai.yaml` 仅为 Codex 提供展示名称，可省略。
+
+导入时不要包含 `node_modules`、`.env`、`weread-story-*.json`、`*.url`、`*.revoke.json` 或 QR 图片；这些均可能含个人数据或凭据。
 
 把仓库中的 `skills/weread-story-publisher` 复制到本机 Codex skills 目录，然后安装二维码依赖：
 

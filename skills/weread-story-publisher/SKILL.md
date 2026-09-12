@@ -7,6 +7,10 @@ description: Generate, publish, QR-share, or revoke an encrypted animated annual
 
 Read the user's authorized annual statistics, prepare the fixed six-screen Story, and publish only after the user approves the exact summary and public share card. The scripts keep the API key and raw response local, encrypt the report before upload, and create a QR code for the animated H5.
 
+## Portability
+
+This is a portable local Skill: the required runtime is Node.js 18+ plus the files in this directory. Codex-only UI metadata lives in `agents/openai.yaml` and is optional. Other agents should import the directory or a package containing `SKILL.md`, `scripts/`, `package.json`, and `package-lock.json`; do not copy API keys, generated reports, QR images, or revoke credentials into the package.
+
 ## First use
 
 The local environment needs Node.js 18+, `WEREAD_API_KEY`, and `WEREAD_STORY_PUBLISH_URL`. Never place the API key in source files or chat output.

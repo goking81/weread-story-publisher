@@ -12,6 +12,9 @@ test('Worker 实际运行时：加密存储、TTL、输入边界、限流及独�
     serviceBindings: { ASSETS: () => new Response('<html><head><title>默认标题</title><meta id="share-description"><meta id="share-og-title"><meta id="share-og-description"><meta id="share-og-image"><meta id="share-og-url"><meta id="share-item-name"><meta id="share-item-description"><meta id="share-item-image"><link id="share-image-src"><meta id="share-twitter-title"><meta id="share-twitter-description"><meta id="share-twitter-image"></head></html>', { headers: { 'Content-Type': 'text/html' } }) }
   }] }));
   try {
+    const root = await mf.dispatchFetch('https://story.test/');
+    assert.equal(root.status, 404);
+    assert.doesNotMatch(await root.text(), /历史深处|34小时56分/);
     const key = randomBytes(32);
     const iv = randomBytes(12);
     const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt', 'decrypt']);

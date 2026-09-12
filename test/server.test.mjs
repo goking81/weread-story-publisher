@@ -23,6 +23,9 @@ test('只保存密文、浏览器可解密，并能撤销一份故事', async (c
     await rm(dataDirectory, { recursive: true, force: true });
   });
   await waitForHealth();
+  const root = await fetch(`${baseUrl}/`);
+  assert.equal(root.status, 404);
+  assert.doesNotMatch(await root.text(), /历史深处|34小时56分/);
   const rawStory = {
     identity: { mode: 'name', nickname: '阅读者' },
     report: {

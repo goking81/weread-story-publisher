@@ -36,6 +36,7 @@ export class PublishRateLimiter extends DurableObject {
 async function route(request, env) {
   const url = new URL(request.url);
   const { pathname } = url;
+  if (request.method === 'GET' && (pathname === '/' || pathname === '/index.html')) return unavailablePage();
   if (request.method === 'GET' && pathname === '/health') return json({ ok: true });
   if (request.method === 'POST' && pathname === '/api/stories') return createStory(request, env, url);
 
@@ -72,7 +73,7 @@ async function revokeStory(request, env, slug) {
 async function storyPage(request, env) {
   const slug = new URL(request.url).pathname.split('/').pop();
   const story = await readStory(env, slug);
-  const assetUrl = new URL('/', request.url);
+  const assetUrl = new URL('/index.html', request.url);
   const response = await env.ASSETS.fetch(new Request(assetUrl, request));
   const headers = new Headers(response.headers);
   headers.set('Cache-Control', 'no-cache');
@@ -98,6 +99,13 @@ async function storyPage(request, env) {
     .on('#share-twitter-image', attributeHandler('content', imageUrl))
     .transform(response);
   return new Response(rewritten.body, { status: rewritten.status, headers });
+}
+
+function unavailablePage() {
+  return new Response('<!doctype html><meta charset="utf-8"><meta name="robots" content="noindex"><meta name="viewport" content="width=device-width,initial-scale=1"><title>阅读故事链接不可用</title><main><h1>请使用完整的阅读故事链接</h1><p>动态阅读故事仅通过发布后生成的专属链接访问。</p></main><style>body{margin:0;background:#0b1322;color:#f5f1e9;font:400 18px/1.7 ui-serif,serif}main{max-width:26rem;margin:0 auto;padding:28vh 2rem;text-align:center}h1{font-size:1.4rem;font-weight:500}p{color:#b9c2d4;font:400 .95rem/1.7 ui-sans-serif,sans-serif}</style>', {
+    status: 404,
+    headers: { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-store', 'X-Robots-Tag': 'noindex, nofollow' }
+  });
 }
 
 async function readStory(env, slug) {
