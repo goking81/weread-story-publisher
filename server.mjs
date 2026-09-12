@@ -8,7 +8,6 @@ const root = dirname(fileURLToPath(import.meta.url));
 const port = positiveInteger(process.env.PORT, 3000);
 const publicBaseUrl = process.env.PUBLIC_BASE_URL?.replace(/\/$/, '');
 const dataFile = resolve(root, process.env.STORY_DATA_FILE || './data/stories.json');
-const inviteCodes = new Set((process.env.PUBLISH_INVITE_CODES || '').split(',').map(code => code.trim()).filter(Boolean));
 const defaultExpiryDays = boundedEnvironmentInteger(process.env.DEFAULT_EXPIRY_DAYS, 30, 1, 365);
 const maxPublishesPerHour = boundedEnvironmentInteger(process.env.PUBLISH_MAX_PUBLISHES_PER_HOUR, 5, 1, 100);
 const publishLimits = new Map();
@@ -22,7 +21,6 @@ const staticFiles = new Map([
 const mimeTypes = { '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.jpg': 'image/jpeg', '.png': 'image/png' };
 let stories = await loadStories();
 
-if (!inviteCodes.size) throw new Error('PUBLISH_INVITE_CODES 必须至少设置一个内测邀请码。');
 await purgeExpiredStories();
 setInterval(() => purgeExpiredStories().catch(console.error), 3600000).unref();
 
@@ -59,7 +57,6 @@ async function route(request, response) {
 }
 
 async function createStory(request, response, url) {
-  if (!isValidInvite(request.headers['x-story-invite'])) return sendJson(response, 401, { error: '邀请码无效。' });
   assertWithinPublishLimit(request);
   const payload = await readJson(request);
   const story = normalizeEnvelope(payload);
@@ -115,11 +112,6 @@ async function purgeExpiredStories() {
   if (activeStories.length === stories.length) return;
   stories = activeStories;
   await saveStories();
-}
-
-function isValidInvite(value) {
-  const invite = Array.isArray(value) ? value[0] : value;
-  return typeof invite === 'string' && [...inviteCodes].some(code => sameSecret(invite, code));
 }
 
 function sameSecret(provided, expected) {

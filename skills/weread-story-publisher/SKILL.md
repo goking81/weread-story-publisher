@@ -9,7 +9,7 @@ Read the user's authorized annual statistics, prepare the fixed six-screen Story
 
 ## First use
 
-The local environment needs Node.js 18+ and `WEREAD_API_KEY`. The shared publisher also requires `WEREAD_STORY_PUBLISH_URL` and an administrator-issued `WEREAD_STORY_INVITE_CODE`; never place either secret in source files or chat output.
+The local environment needs Node.js 18+, `WEREAD_API_KEY`, and `WEREAD_STORY_PUBLISH_URL`. Never place the API key in source files or chat output.
 
 Install the Skill's one runtime dependency once when `node_modules` is absent:
 
@@ -65,7 +65,7 @@ Show the user the year, total reading duration, number of books, hero book and d
 
 ## Publish
 
-The administrator supplies `WEREAD_STORY_PUBLISH_URL` and `WEREAD_STORY_INVITE_CODE` in the controlled execution environment. Never print or persist the invite code. This v0.1 is a controlled beta: public source does not imply unrestricted access to the shared publisher.
+Set `WEREAD_STORY_PUBLISH_URL` to the public publisher endpoint. Publishing is open to the public; the Worker still enforces a per-network hourly limit. Do not claim that open publishing eliminates the need to review the public share card.
 
 Run:
 

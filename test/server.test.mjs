@@ -10,11 +10,10 @@ import { setTimeout as wait } from 'node:timers/promises';
 const root = new URL('..', import.meta.url);
 const port = 34000 + Math.floor(Math.random() * 8000);
 const baseUrl = `http://127.0.0.1:${port}`;
-const inviteCode = 'test-invite-code-is-long-enough-1234';
 const dataDirectory = await mkdtemp(join(tmpdir(), 'weread-story-test-'));
 const server = spawn(process.execPath, ['server.mjs'], {
   cwd: root,
-  env: { ...process.env, PORT: String(port), PUBLIC_BASE_URL: baseUrl, PUBLISH_INVITE_CODES: inviteCode, DEFAULT_EXPIRY_DAYS: '30', STORY_DATA_FILE: join(dataDirectory, 'stories.json') },
+  env: { ...process.env, PORT: String(port), PUBLIC_BASE_URL: baseUrl, DEFAULT_EXPIRY_DAYS: '30', STORY_DATA_FILE: join(dataDirectory, 'stories.json') },
   stdio: 'ignore'
 });
 
@@ -36,12 +35,9 @@ test('只保存密文、浏览器可解密，并能撤销一份故事', async (c
     }
   };
   const { key, envelope, revokeHash } = await encryptStory(rawStory);
-  const rejected = await fetch(`${baseUrl}/api/stories`, { method: 'POST', headers: { 'X-Story-Invite': 'wrong-code', 'Content-Type': 'application/json' }, body: JSON.stringify({ envelope, revokeHash }) });
-  assert.equal(rejected.status, 401);
-
   const created = await fetch(`${baseUrl}/api/stories`, {
     method: 'POST',
-    headers: { 'X-Story-Invite': inviteCode, 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ envelope, revokeHash })
   });
   assert.equal(created.status, 201);

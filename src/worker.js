@@ -48,7 +48,6 @@ async function route(request, env) {
 }
 
 async function createStory(request, env, url) {
-  if (!await isValidInvite(request.headers.get('X-Story-Invite'), env.PUBLISH_INVITE_CODES)) return json({ error: '邀请码无效。' }, 401);
   await assertWithinPublishLimit(request, env);
   const payload = await readJson(request);
   const story = normalizeEnvelope(payload, env.DEFAULT_EXPIRY_DAYS);
@@ -173,11 +172,6 @@ async function assertWithinPublishLimit(request, env) {
   const bucket = Math.floor(Date.now() / 3600000);
   const maximum = boundedInteger(Number(env.PUBLISH_MAX_PUBLISHES_PER_HOUR), 1, 100, 'PUBLISH_MAX_PUBLISHES_PER_HOUR');
   if (!await env.PUBLISH_RATE_LIMITER.getByName(identity).allow(bucket, maximum)) throw tooManyRequests('此网络的发布次数已达本小时上限。');
-}
-
-async function isValidInvite(provided, configuredCodes) {
-  if (typeof provided !== 'string' || !configuredCodes) return false;
-  return (await Promise.all(configuredCodes.split(',').map(code => sameDigest(provided, code.trim())))).some(Boolean);
 }
 
 async function sameDigest(provided, expected) {

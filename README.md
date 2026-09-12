@@ -13,7 +13,7 @@
 - 三种署名方式：昵称与头像（默认）、仅昵称、匿名
 - 可安装的 Codex Skill：`skills/weread-story-publisher/`
 
-尚未接入微信 JS-SDK 和普通用户自助登录。当前 v0.1 是公开源码、受控发布的测试版：读取使用用户自己的微信读书 API Key，发布到共享站点仍需管理员邀请码。
+尚未接入微信 JS-SDK 和普通用户自助登录。当前 v0.1 已开放公共发布：读取使用用户自己的微信读书 API Key，任何用户都可将经确认的密文 Story 发布到共享站点。
 
 ## 安装 Skill
 
@@ -50,7 +50,6 @@ node skills/weread-story-publisher/scripts/prepare-story.mjs `
 
 ```powershell
 $env:WEREAD_STORY_PUBLISH_URL='https://readstory.learnbox.cc'
-$env:WEREAD_STORY_INVITE_CODE='<管理员提供的邀请码>'
 node skills/weread-story-publisher/scripts/publish-story.mjs weread-story-2026.json
 ```
 
@@ -85,7 +84,7 @@ npx wrangler dev
 项目使用 Worker 静态资源、KV 和 Durable Object，不需要购买服务器，也不依赖 Supabase。
 
 1. 创建名为 `WEREAD_STORIES` 的 KV，并把 ID 写入 `wrangler.jsonc`。
-2. 设置 Worker secrets：`PUBLISH_INVITE_CODES` 与 `RATE_LIMIT_SALT`。
+2. 设置 Worker secret：`RATE_LIMIT_SALT`。
 3. 运行 `npm test` 和 `npx wrangler deploy`，或在 Cloudflare 中连接本 GitHub 仓库。
 4. 将 Custom Domain 设为 `readstory.learnbox.cc`；Cloudflare 自动管理 DNS 和 HTTPS 证书。
 
@@ -103,4 +102,4 @@ npx wrangler dev
 
 ## Skill 的作用范围
 
-Skill 负责读取经过授权的年度统计、校验最小数据、按用户选择处理署名、本机加密、发布、生成二维码和撤销文件。它不会自行绕过微信读书授权，也不会把 API Key、邀请码或完整分享链接提交到 GitHub。ChatGPT 网页端若要直接调用，仍需要一个已授权的本地工具或 MCP 执行这些脚本。
+Skill 负责读取经过授权的年度统计、校验最小数据、按用户选择处理署名、本机加密、发布、生成二维码和撤销文件。它不会自行绕过微信读书授权，也不会把 API Key 或完整分享链接提交到 GitHub。ChatGPT 网页端若要直接调用，仍需要一个已授权的本地工具或 MCP 执行这些脚本。

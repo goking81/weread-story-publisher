@@ -9,9 +9,10 @@ let secrets;
 try { secrets = JSON.parse(await readFile(path, 'utf8')); }
 catch (error) {
   if (error.code !== 'ENOENT') throw error;
-  secrets = { PUBLISH_INVITE_CODES: randomBytes(32).toString('base64url'), RATE_LIMIT_SALT: randomBytes(32).toString('base64url') };
+  secrets = { RATE_LIMIT_SALT: randomBytes(32).toString('base64url') };
   await writeFile(path, JSON.stringify(secrets), { encoding: 'utf8', mode: 0o600, flag: 'wx' });
 }
+delete secrets.PUBLISH_INVITE_CODES;
 const cli = spawn(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'secret', 'bulk'], {
   env: { ...process.env, XDG_CONFIG_HOME: resolve('.wrangler-config') },
   stdio: ['pipe', 'inherit', 'inherit']

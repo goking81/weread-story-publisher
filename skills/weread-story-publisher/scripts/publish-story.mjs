@@ -6,10 +6,9 @@ import QRCode from 'qrcode';
 
 const [payloadPath] = process.argv.slice(2);
 const baseUrl = process.env.WEREAD_STORY_PUBLISH_URL?.replace(/\/$/, '');
-const inviteCode = process.env.WEREAD_STORY_INVITE_CODE;
 
-if (!payloadPath || !baseUrl || !inviteCode) {
-  throw new Error('需要 payload 文件、WEREAD_STORY_PUBLISH_URL 和 WEREAD_STORY_INVITE_CODE。');
+if (!payloadPath || !baseUrl) {
+  throw new Error('需要 payload 文件和 WEREAD_STORY_PUBLISH_URL。');
 }
 
 const story = JSON.parse(await readFile(payloadPath, 'utf8'));
@@ -34,7 +33,7 @@ const payload = {
 };
 const response = await fetch(`${baseUrl}/api/stories`, {
   method: 'POST',
-  headers: { 'Content-Type': 'application/json', 'X-Story-Invite': inviteCode },
+  headers: { 'Content-Type': 'application/json' },
   body: JSON.stringify(payload)
 });
 const result = await response.json();

@@ -8,7 +8,7 @@ test('Worker 实际运行时：加密存储、TTL、输入边界、限流及独�
     modules: true, scriptPath: 'src/worker.js', compatibilityDate: '2026-09-11',
     kvNamespaces: ['WEREAD_STORIES'],
     durableObjects: { PUBLISH_RATE_LIMITER: { className: 'PublishRateLimiter', useSQLite: true } },
-    bindings: { PUBLISH_INVITE_CODES: 'test-invite', RATE_LIMIT_SALT: 'test-salt', DEFAULT_EXPIRY_DAYS: 30, PUBLISH_MAX_PUBLISHES_PER_HOUR: 5 },
+    bindings: { RATE_LIMIT_SALT: 'test-salt', DEFAULT_EXPIRY_DAYS: 30, PUBLISH_MAX_PUBLISHES_PER_HOUR: 5 },
     serviceBindings: { ASSETS: () => new Response('<html><head><title>默认标题</title><meta id="share-description"><meta id="share-og-title"><meta id="share-og-description"><meta id="share-og-image"><meta id="share-og-url"><meta id="share-item-name"><meta id="share-item-description"><meta id="share-item-image"><link id="share-image-src"><meta id="share-twitter-title"><meta id="share-twitter-description"><meta id="share-twitter-image"></head></html>', { headers: { 'Content-Type': 'text/html' } }) }
   }] }));
   try {
@@ -19,8 +19,7 @@ test('Worker 实际运行时：加密存储、TTL、输入边界、限流及独�
     const credential = randomBytes(32).toString('base64url');
     const share = { title: '2026，我一直在往历史深处走', description: '34小时56分，71%的阅读时间留给了同一套书', imageUrl: '/assets/history-deep-republic-one-hd.jpg' };
     const body = JSON.stringify({ envelope: { version: 1, iv: iv.toString('base64url'), ciphertext: Buffer.from(ciphertext).toString('base64url') }, revokeHash: credential, share });
-    const post = (content, invite = 'test-invite') => mf.dispatchFetch('https://story.test/api/stories', { method: 'POST', headers: { 'X-Story-Invite': invite }, body: content });
-    assert.equal((await post(body, 'wrong')).status, 401);
+    const post = content => mf.dispatchFetch('https://story.test/api/stories', { method: 'POST', body: content });
     assert.equal((await post(JSON.stringify({ report: '明文' }))).status, 400);
     assert.equal((await post('a'.repeat(90001))).status, 400);
     const result = await post(body);
