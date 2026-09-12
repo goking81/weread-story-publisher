@@ -23,7 +23,10 @@ test('把微信读书年度秒数稳定转换为故事分钟、占比和公开�
   assert.equal(story.report.booksRead, 9);
   assert.deepEqual(story.report.topics, ['历史', '人物传记', '文学']);
   assert.equal(story.report.topBook.coverUrl, 'https://example.com/cover.jpg');
-  assert.match(story.share.title, /往历史深处走/);
+  assert.ok(story.narrative.pages.length >= 3);
+  assert.ok(story.narrative.pages.some(page => page.type === 'book'));
+  assert.ok(story.narrative.pages.some(page => page.type === 'topics'));
+  assert.match(story.share.title, /2026 阅读故事/);
   assert.match(story.share.description, /34小时56分/);
 });
 
@@ -35,4 +38,30 @@ test('署名方式要求与公开信息匹配', () => {
     { mode: 'name_avatar', nickname: '阅读者', avatarUrl: 'https://example.com/avatar.jpg' }
   );
   assert.throws(() => buildIdentity({ identity: 'name_avatar', nickname: '阅读者' }), /头像地址缺失/);
+});
+
+test('故事页由可靠信号决定，不沿用试用原型的固定六页', () => {
+  const sparse = buildStoryFromReadData({
+    totalReadTime: 72_000,
+    readLongest: [{ readTime: 24_000, book: { title: '甲书', cover: 'https://example.com/a.jpg' } }],
+    preferCategory: []
+  }, { year: 2025, identity: { mode: 'anonymous' } });
+  const rich = buildStoryFromReadData({
+    totalReadTime: 360_000,
+    readDays: 219,
+    readRate: 72,
+    readLongest: [
+      { readTime: 120_000, book: { title: '甲书', cover: 'https://example.com/a.jpg' } },
+      { readTime: 80_000, book: { title: '乙书', cover: 'https://example.com/b.jpg' } },
+      { readTime: 40_000, book: { title: '丙书', cover: 'https://example.com/c.jpg' } }
+    ],
+    preferCategory: [{ categoryTitle: '历史', readingTime: 240_000, readingCount: 6 }],
+    preferAuthor: [{ name: '作者甲', count: 3 }],
+    preferTime: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4_000, 4_000, 8_000, 30_000, 30_000, 20_000, 0, 0, 0, 0, 0, 0]
+  }, { year: 2025, identity: { mode: 'anonymous' } });
+
+  assert.ok(sparse.narrative.pages.length < rich.narrative.pages.length);
+  assert.equal(sparse.narrative.pages.some(page => page.type === 'days'), false);
+  assert.ok(rich.narrative.pages.some(page => page.type === 'days'));
+  assert.ok(rich.narrative.pages.every(page => !/历史深处|同一套书/.test(page.title + page.body)));
 });

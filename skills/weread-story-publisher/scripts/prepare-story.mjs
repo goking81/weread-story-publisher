@@ -8,41 +8,100 @@ const WEREAD_SKILL_VERSION = '1.0.4';
 
 export function buildStoryFromReadData(data, { year, identity, expiresInDays = 30 }) {
   const totalSeconds = positiveNumber(data.totalReadTime, 'totalReadTime');
-  const rankedBook = (Array.isArray(data.readLongest) ? data.readLongest : [])
-    .find(item => item?.book?.title && item?.book?.cover && Number(item.readTime) > 0);
+  const rankedBooks = collectRankedBooks(data.readLongest);
+  const rankedBook = rankedBooks[0];
   if (!rankedBook) throw new Error('年度统计中没有可用于主视觉的电子书及封面。');
 
   const booksRead = parseBooksRead(data.readStat);
-  const coverUrl = normalizeHttpsUrl(rankedBook.book.cover, '主书封面');
-  const topics = collectTopics(data.preferCategory, rankedBook.book.category);
+  const topics = collectTopics(data.preferCategory, rankedBook.categories);
   const totalMinutes = Math.max(1, Math.round(totalSeconds / 60));
-  const topBookMinutes = Math.max(1, Math.round(Number(rankedBook.readTime) / 60));
-  const focusPercent = Math.min(100, Math.max(1, Math.round(Number(rankedBook.readTime) / totalSeconds * 100)));
-  const primaryTopic = topics[0];
+  const topBookMinutes = rankedBook.minutes;
+  const focusPercent = percentage(rankedBook.seconds, totalSeconds);
   const hours = Math.floor(totalMinutes / 60);
   const minutes = totalMinutes % 60;
+  const report = {
+    year,
+    totalMinutes,
+    booksRead,
+    readDays: optionalPositiveInteger(data.readDays),
+    focusPercent,
+    topBook: rankedBook,
+    topBooks: rankedBooks.slice(0, 3),
+    topics,
+    categoryFocus: calculateCategoryFocus(data.preferCategory),
+    preferredAuthor: selectPreferredAuthor(data.preferAuthor),
+    readingRhythm: calculateReadingRhythm(data.preferTime),
+    readRate: optionalPercentage(data.readRate)
+  };
 
   return {
     identity,
-    report: {
-      year,
-      focusPercent,
-      totalMinutes,
-      booksRead,
-      topBook: {
-        title: cleanText(rankedBook.book.title, '主书书名'),
-        minutes: topBookMinutes,
-        coverUrl
-      },
-      topics
-    },
+    report,
+    narrative: { version: 1, pages: buildNarrative(report) },
     share: {
-      title: `${year}，我一直在往${primaryTopic}深处走`,
-      description: `${hours}小时${minutes}分，${focusPercent}%的阅读时间留给了同一本书`,
-      imageUrl: coverUrl
+      title: `${year} 阅读故事 · ${hours}小时${minutes}分`,
+      description: `${hours}小时${minutes}分${booksRead ? ` · 读过 ${booksRead} 本` : ''}，生成一份只属于这段阅读记录的故事`,
+      imageUrl: rankedBook.coverUrl
     },
     expiresInDays
   };
+}
+
+export function buildNarrative(report) {
+  const candidates = [
+    report.topBook && {
+      type: 'book', score: .3 + report.focusPercent / 100, label: '投入最多的一本书',
+      title: `《${report.topBook.title}》`,
+      metric: formatDuration(report.topBook.minutes),
+      body: `${report.focusPercent}% 的阅读时间，留在这里。`, coverUrl: report.topBook.coverUrl
+    },
+    report.readDays && {
+      type: 'days', score: Math.min(.85, report.readDays / 365), label: '阅读出现的日子',
+      title: `${report.readDays} 天`, metric: '有效阅读日',
+      body: '阅读没有占满每一天，但它确实在这一年里反复出现。'
+    },
+    report.topics.length && {
+      type: 'topics', score: .35 + (report.categoryFocus || 0) / 2, label: '时间落下的方向',
+      title: report.topics.slice(0, 4).join(' · '), metric: '阅读主题',
+      body: report.categoryFocus >= .55 ? '多数时间落在相近的主题里。' : '它们共同构成了这一年的阅读版图。', topics: report.topics.slice(0, 4)
+    },
+    report.readingRhythm && {
+      type: 'rhythm', score: report.readingRhythm.share, label: '阅读常发生在',
+      title: report.readingRhythm.label, metric: `${Math.round(report.readingRhythm.share * 100)}% 的时段集中于此`,
+      body: '这是年度时段记录呈现出的重心，不是对生活方式的定义。'
+    },
+    report.preferredAuthor && {
+      type: 'author', score: Math.min(.8, .3 + report.preferredAuthor.count / 10), label: '反复读到的作者',
+      title: report.preferredAuthor.name, metric: `${report.preferredAuthor.count} 本`,
+      body: '这份年度记录里，这位作者被多次读到。'
+    },
+    report.readRate !== null && {
+      type: 'format', score: Math.abs(report.readRate - 50) / 100 + .25, label: '阅读与收听',
+      title: `${report.readRate}%`, metric: '文字阅读占比',
+      body: report.readRate >= 50 ? '其余时间来自收听或朗读记录。' : '更多时间来自收听或朗读记录。'
+    },
+    report.topBooks.length >= 2 && {
+      type: 'shelf', score: .28 + report.topBooks.length / 20, label: '时间还留在',
+      title: `${report.topBooks.length} 本主要读物`, metric: '年度阅读排行',
+      body: '这些书共同占据了年度阅读时长的前列。', books: report.topBooks
+    }
+  ].filter(Boolean).sort((left, right) => right.score - left.score).slice(0, 5);
+
+  return [
+    {
+      type: 'opening', label: '年度阅读', title: `${report.year}，您留给阅读`,
+      metric: formatDuration(report.totalMinutes),
+      body: report.booksRead ? `读过 ${report.booksRead} 本。故事会从数据最清晰的部分开始。` : '故事会从数据最清晰的部分开始。'
+    },
+    ...candidates,
+    {
+      type: 'closing', label: `MY READING STORY · ${report.year}`,
+      title: `${report.year}，阅读留下了一条自己的路径。`,
+      metric: formatDuration(report.totalMinutes),
+      body: [report.booksRead && `${report.booksRead} 本`, ...report.topics.slice(0, 3)].filter(Boolean).join(' · '),
+      coverUrl: report.topBook.coverUrl
+    }
+  ];
 }
 
 export function buildIdentity(options) {
@@ -116,8 +175,7 @@ function parseArgs(args) {
 function parseBooksRead(stats) {
   const value = (Array.isArray(stats) ? stats : []).find(item => item?.stat === '读过')?.counts;
   const match = String(value || '').match(/\d+/);
-  if (!match || Number(match[0]) < 1) throw new Error('年度统计中缺少可靠的“读过”本数。');
-  return Number(match[0]);
+  return match && Number(match[0]) > 0 ? Number(match[0]) : null;
 }
 
 function collectTopics(categories, fallback) {
@@ -128,6 +186,61 @@ function collectTopics(categories, fallback) {
   else if (typeof fallback === 'string') candidates.push(...fallback.split(/[·/、,，]/));
   const topics = [...new Set(candidates.map(value => typeof value === 'string' ? value.trim() : '').filter(Boolean))].slice(0, 4);
   return topics.length ? topics : ['阅读'];
+}
+
+function collectRankedBooks(items) {
+  return (Array.isArray(items) ? items : [])
+    .map(item => {
+      if (!item?.book?.title || !item.book.cover || Number(item.readTime) <= 0) return null;
+      return {
+        title: cleanText(item.book.title, '主书书名'),
+        minutes: Math.max(1, Math.round(Number(item.readTime) / 60)),
+        seconds: Number(item.readTime),
+        coverUrl: normalizeHttpsUrl(item.book.cover, '主书封面'),
+        categories: item.book.category
+      };
+    }).filter(Boolean);
+}
+
+function calculateCategoryFocus(categories) {
+  const values = (Array.isArray(categories) ? categories : []).map(item => Number(item?.readingTime)).filter(value => value > 0);
+  if (!values.length) return 0;
+  return Math.max(...values) / values.reduce((sum, value) => sum + value, 0);
+}
+
+function selectPreferredAuthor(authors) {
+  const author = (Array.isArray(authors) ? authors : []).find(item => typeof item?.name === 'string' && Number(item?.count) >= 2);
+  return author ? { name: cleanText(author.name, '偏好作者'), count: Number(author.count) } : null;
+}
+
+function calculateReadingRhythm(preferTime) {
+  const values = Array.isArray(preferTime) ? preferTime.map(Number) : [];
+  if (values.length !== 24 || values.some(value => !Number.isFinite(value) || value < 0)) return null;
+  const groups = [
+    { label: '清晨与上午', hours: [6, 7, 8, 9, 10, 11] }, { label: '午后', hours: [12, 13, 14, 15, 16, 17] },
+    { label: '傍晚', hours: [18, 19, 20, 21] }, { label: '夜晚', hours: [22, 23, 0, 1, 2, 3, 4, 5] }
+  ].map(group => ({ ...group, seconds: group.hours.reduce((sum, hour) => sum + values[(hour + 18) % 24], 0) }));
+  const total = groups.reduce((sum, group) => sum + group.seconds, 0);
+  const leader = groups.sort((left, right) => right.seconds - left.seconds)[0];
+  return total >= 36_000 && leader.seconds / total >= .35 ? { label: leader.label, share: leader.seconds / total } : null;
+}
+
+function optionalPositiveInteger(value) {
+  const number = Number(value);
+  return Number.isInteger(number) && number > 0 ? number : null;
+}
+
+function optionalPercentage(value) {
+  const number = Number(value);
+  return Number.isFinite(number) && number > 0 && number < 100 ? Math.round(number) : null;
+}
+
+function percentage(part, whole) {
+  return Math.min(100, Math.max(1, Math.round(part / whole * 100)));
+}
+
+function formatDuration(minutes) {
+  return `${Math.floor(minutes / 60)}小时${minutes % 60}分`;
 }
 
 function normalizeHttpsUrl(value, name) {

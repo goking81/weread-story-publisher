@@ -5,7 +5,7 @@ description: Generate, publish, QR-share, or revoke an encrypted animated annual
 
 # WeRead Story Publisher
 
-Read the user's authorized annual statistics, prepare the fixed six-screen Story, and publish only after the user approves the exact summary and public share card. The scripts keep the API key and raw response local, encrypt the report before upload, and create a QR code for the animated H5.
+Read the user's authorized annual statistics, compose a data-driven annual Story, and publish only after the user approves the exact summary and public share card. The scripts keep the API key and raw response local, encrypt the report before upload, and create a QR code for the animated H5.
 
 ## Portability
 
@@ -41,7 +41,7 @@ node <skill-directory>/scripts/prepare-story.mjs --year 2026 --identity name --n
 node <skill-directory>/scripts/prepare-story.mjs --year 2026 --identity name_avatar --nickname <name> --avatar-url <https-url> --output <local-json>
 ```
 
-The script calls only the annual reading-statistics endpoint, treats all duration fields as seconds, selects the longest-ranked electronic book with a real cover, and derives the focus percentage. It does not read or upload notes, highlights, WeChat IDs, WeRead IDs, or the full reading history.
+The script calls only the annual reading-statistics endpoint and treats all duration fields as seconds. It composes 3–7 Story screens from data that is actually available: total time, leading book, active reading days, topics, reading time window, recurring author, reading/listening split, or leading books. It omits weak or absent signals. The prototype's six screens and its historical-reading copy are not a template for users.
 
 ## Validate before publishing
 
@@ -49,7 +49,7 @@ The script calls only the annual reading-statistics endpoint, treats all duratio
 - Default identity mode to `name_avatar`; honor explicit `name` or `anonymous` choices. Do not include WeChat IDs, WeRead IDs, raw notes, or the full reading-history export.
 - Use a direct HTTPS book-cover image or a same-origin authorized asset. Never use a screenshot of a reader/store page as a cover.
 - The share-card title, short description, and image URL are intentionally public so WeChat can read them without the fragment key. Tell the user this narrow exception; keep the full report encrypted.
-- Keep the fixed six-screen narrative intact unless the user explicitly asks to change the product logic.
+- Review the generated `narrative.pages`: their count, data sources, and wording must come from the user's own report. Do not force a page just to meet a fixed screen count; do not use personality labels or unsupported inferences.
 
 The prepared UTF-8 JSON has this shape:
 

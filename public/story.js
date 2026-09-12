@@ -1,18 +1,26 @@
 import qrcode from '/qrcode.mjs';
 
-const pages = document.querySelectorAll('.page');
 const capture = Number(new URLSearchParams(location.search).get('slide'));
-if (capture >= 1 && capture <= pages.length) {
-  document.querySelector('.report').classList.add('capture');
-  pages.forEach((page, index) => page.style.display = index === capture - 1 ? 'flex' : 'none');
-  pages[capture - 1].classList.add('seen');
-} else {
-  const observer = new IntersectionObserver(entries => entries.forEach(entry => entry.isIntersecting && entry.target.classList.add('seen')), { threshold: .45 });
-  pages.forEach(page => observer.observe(page));
+let pageObserver;
+activatePages();
+
+function activatePages() {
+  const pages = [...document.querySelectorAll('.page')];
+  pageObserver?.disconnect();
+  if (capture >= 1 && capture <= pages.length) {
+    document.querySelector('.report').classList.add('capture');
+    pages.forEach((page, index) => page.style.display = index === capture - 1 ? 'flex' : 'none');
+    pages[capture - 1].classList.add('seen');
+    return;
+  }
+  pageObserver = new IntersectionObserver(entries => entries.forEach(entry => entry.isIntersecting && entry.target.classList.add('seen')), { threshold: .45 });
+  pages.forEach(page => pageObserver.observe(page));
 }
 
 const shareSheet = document.querySelector('#shareSheet');
-document.querySelector('#shareLaunch')?.addEventListener('click', () => shareSheet?.showModal());
+document.addEventListener('click', event => {
+  if (event.target.closest('#shareLaunch')) shareSheet?.showModal();
+});
 
 const identityNote = document.querySelector('#identityNote');
 document.querySelectorAll('[data-identity]').forEach(option => option.addEventListener('click', () => {
@@ -47,6 +55,7 @@ async function decryptStory(envelope, key) {
 }
 
 function renderStory(story, expiresAt) {
+  if (Array.isArray(story?.narrative?.pages)) return renderDynamicStory(story, expiresAt);
   const { report, identity } = story;
   const set = (name, value) => document.querySelectorAll(`[data-story="${name}"]`).forEach(node => node.textContent = String(value));
   const totalHours = Math.floor(report.totalMinutes / 60);
@@ -73,6 +82,113 @@ function renderStory(story, expiresAt) {
   identityNote.textContent = `本次发布署名：${identityLabel(identity.mode)}。有效期至 ${expiry}。`;
   renderShareCode(expiry);
   document.title = `${report.year} 阅读故事`;
+}
+
+function renderDynamicStory(story, expiresAt) {
+  const report = document.querySelector('.report');
+  const main = document.createElement('main');
+  main.className = 'report dynamic-report';
+  main.setAttribute('aria-label', `${story.report.year} 阅读故事`);
+  story.narrative.pages.forEach((page, index) => main.append(renderDynamicPage(page, index, story.narrative.pages.length, story.identity)));
+  report.replaceWith(main);
+  activatePages();
+  document.querySelector('#identityOptions').hidden = true;
+  const expiry = new Date(expiresAt).toLocaleString('zh-CN', { hour12: false });
+  identityNote.textContent = `本次发布署名：${identityLabel(story.identity.mode)}。有效期至 ${expiry}。`;
+  renderShareCode(expiry);
+  document.title = `${story.report.year} 阅读故事`;
+}
+
+function renderDynamicPage(page, index, total, identity) {
+  const section = document.createElement('section');
+  section.className = `page dynamic-page ${index % 2 ? 'night' : 'paper'} dynamic-${page.type}`;
+  section.append(renderHeader(page.label, index, total));
+  if (index === 0 && identity?.mode !== 'anonymous' && identity?.nickname) section.append(renderIdentity(identity));
+
+  const body = document.createElement('div');
+  body.className = 'dynamic-body';
+  addText(body, 'p', 'dynamic-kicker', page.type === 'opening' ? 'MY READING STORY' : page.label);
+  addText(body, 'h1', 'dynamic-title', page.title);
+  if (page.coverUrl) body.append(renderCover(page.coverUrl, page.title));
+  if (Array.isArray(page.books)) body.append(renderBookShelf(page.books));
+  if (Array.isArray(page.topics)) body.append(renderTopics(page.topics));
+  addText(body, 'strong', 'dynamic-metric', page.metric);
+  addText(body, 'p', 'dynamic-copy', page.body);
+  section.append(body);
+
+  const footer = document.createElement('footer');
+  addText(footer, 'p', '', page.type === 'closing' ? '由年度阅读记录生成' : `阅读故事 · ${String(index + 1).padStart(2, '0')}`);
+  addText(footer, 'b', '', String(index + 1).padStart(2, '0'));
+  section.append(footer);
+  if (page.type === 'closing') {
+    const launch = document.createElement('button');
+    launch.id = 'shareLaunch';
+    launch.className = 'share-launch';
+    launch.type = 'button';
+    launch.textContent = '生成分享链接';
+    section.insertBefore(launch, footer);
+  }
+  return section;
+}
+
+function renderHeader(label, index, total) {
+  const header = document.createElement('header');
+  addText(header, 'span', 'label', label);
+  const dots = document.createElement('span');
+  dots.className = 'dots';
+  for (let position = 0; position < total; position += 1) {
+    const dot = document.createElement('i');
+    if (position === index) dot.className = 'on';
+    dots.append(dot);
+  }
+  header.append(dots);
+  addText(header, 'span', 'page-no', `${String(index + 1).padStart(2, '0')}/${String(total).padStart(2, '0')}`);
+  return header;
+}
+
+function renderIdentity(identity) {
+  const mark = document.createElement('div');
+  mark.className = 'reader-mark';
+  if (identity.mode === 'name_avatar' && identity.avatarUrl) {
+    const avatar = document.createElement('img');
+    avatar.src = identity.avatarUrl;
+    avatar.alt = '';
+    mark.append(avatar);
+  }
+  addText(mark, 'span', '', `${identity.nickname} 的阅读视界`);
+  return mark;
+}
+
+function renderCover(url, title) {
+  const cover = document.createElement('div');
+  cover.className = 'book dynamic-cover';
+  const image = document.createElement('img');
+  image.src = url;
+  image.alt = `${title} 书封`;
+  cover.append(image);
+  return cover;
+}
+
+function renderBookShelf(books) {
+  const shelf = document.createElement('div');
+  shelf.className = 'dynamic-shelf';
+  books.forEach(book => shelf.append(renderCover(book.coverUrl, book.title)));
+  return shelf;
+}
+
+function renderTopics(topics) {
+  const list = document.createElement('div');
+  list.className = 'dynamic-topics';
+  topics.forEach(topic => addText(list, 'span', '', topic));
+  return list;
+}
+
+function addText(parent, tagName, className, value) {
+  const node = document.createElement(tagName);
+  if (className) node.className = className;
+  node.textContent = value || '';
+  parent.append(node);
+  return node;
 }
 
 function renderShareCode(expiry) {
