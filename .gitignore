@@ -3,6 +3,7 @@ dist/
 .npm-cache/
 .wrangler/
 .wrangler-config/
+.gh-config/
 .dev.vars
 .local-publish.json
 *.url
