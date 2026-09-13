@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="540" viewBox="0 0 1200 540" role="img" aria-labelledby="title desc">
+  <title id="title">微信读书 API Key 的安全配置流程</title>
+  <desc id="desc">从已授权的微信读书 Agent API 渠道获得 wrk 开头的 Key，在本机 localhost 设置页输入，再验证本地配置；不要输入微信密码或使用非官方取 Key 工具。</desc>
+  <rect width="1200" height="540" fill="#f3eee3"/>
+  <g font-family="system-ui, -apple-system, 'Microsoft YaHei', sans-serif">
+    <text x="50" y="55" fill="#13213b" font-family="Georgia, 'Songti SC', serif" font-size="28">API Key 只从已授权的微信读书 Agent API 渠道取得</text>
+    <text x="50" y="87" fill="#657086" font-size="16">下图是本项目的配置流程示意，不是微信读书官网页面截图。</text>
+    <g fill="none" stroke="#d8a741" stroke-width="3" stroke-linecap="round"><path d="M302 282h76"/><path d="M602 282h76"/><path d="M902 282h76"/><path d="m366 273 12 9-12 9m288-18 12 9-12 9m288-18 12 9-12 9"/></g>
+    <g transform="translate(50 135)"><rect width="252" height="288" rx="18" fill="#13213b"/><text x="26" y="52" fill="#d8a741" font-size="16" letter-spacing="1.6">01 · 取得授权</text><text x="26" y="105" fill="#fffaf0" font-size="29" font-weight="700">官方 Agent API</text><text x="26" y="145" fill="#fffaf0" font-size="29" font-weight="700">渠道或管理员</text><rect x="26" y="180" width="198" height="42" rx="7" fill="#263752"/><text x="42" y="208" fill="#bfc9d9" font-size="18">wrk-••••••••••••</text><text x="26" y="258" fill="#bfc9d9" font-size="15">每个平台入口可能不同</text></g>
+    <g transform="translate(350 135)"><rect width="252" height="288" rx="18" fill="#fffaf0" stroke="#d8a741"/><text x="26" y="52" fill="#a26a17" font-size="16" letter-spacing="1.6">02 · 本机设置页</text><text x="26" y="105" fill="#13213b" font-size="29" font-weight="700">运行 setup.mjs</text><text x="26" y="145" fill="#13213b" font-size="29" font-weight="700">打开 localhost</text><rect x="26" y="180" width="198" height="42" rx="7" fill="#e6decf"/><text x="42" y="208" fill="#657086" font-size="16">127.0.0.1:&lt;port&gt;</text><text x="26" y="258" fill="#657086" font-size="15">只在自己的电脑访问</text></g>
+    <g transform="translate(650 135)"><rect width="252" height="288" rx="18" fill="#13213b"/><text x="26" y="52" fill="#d8a741" font-size="16" letter-spacing="1.6">03 · 仅本机保存</text><text x="26" y="105" fill="#fffaf0" font-size="29" font-weight="700">输入自己的</text><text x="26" y="145" fill="#fffaf0" font-size="29" font-weight="700">wrk-… Key</text><text x="26" y="210" fill="#bfc9d9" font-size="15">不发到聊天、Git 或发布站</text><text x="26" y="242" fill="#bfc9d9" font-size="15">不填写微信密码或验证码</text></g>
+    <g transform="translate(950 135)"><rect width="200" height="288" rx="18" fill="#fffaf0" stroke="#d8a741"/><text x="24" y="52" fill="#a26a17" font-size="16" letter-spacing="1.6">04 · 验证</text><text x="24" y="105" fill="#13213b" font-size="27" font-weight="700">生成年度</text><text x="24" y="143" fill="#13213b" font-size="27" font-weight="700">阅读故事</text><text x="24" y="210" fill="#657086" font-size="15">失败时检查 Key 权限</text><text x="24" y="242" fill="#657086" font-size="15">或联系授权方</text></g>
+    <rect x="50" y="457" width="1100" height="52" rx="12" fill="#f7ddd5"/>
+    <text x="76" y="490" fill="#80352b" font-size="17" font-weight="700">不要：使用微信账号密码、短信验证码、Cookie、抓包数据，或安装声称能“提取 Key”的第三方工具。</text>
+  </g>
+</svg>

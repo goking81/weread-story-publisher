@@ -23,6 +23,8 @@ It prints a `http://127.0.0.1:<port>` URL. The user opens that local page and en
 
 `WEREAD_API_KEY` and `WEREAD_STORY_PUBLISH_URL` remain optional environment-variable overrides for advanced users and managed Agent hosts. The default publisher is `https://readstory.learnbox.cc`.
 
+The Skill cannot issue a WeRead API Key. The user must obtain their own `wrk-...` key through an authorized WeRead Agent API channel or from the administrator of the Agent/API service they use. It is not a WeRead password, SMS verification code, browser cookie, or captured session credential. If the user has no authorized Key source, stop; do not suggest login bypasses, cookie extraction, traffic capture, or third-party "key retrieval" tools.
+
 Install the Skill's one runtime dependency once when `node_modules` is absent:
 
 ```text
