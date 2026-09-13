@@ -61,7 +61,9 @@ test('故事页由可靠信号决定，不沿用试用原型的固定六页', ()
   }, { year: 2025, identity: { mode: 'anonymous' } });
 
   assert.ok(sparse.narrative.pages.length < rich.narrative.pages.length);
+  assert.equal(sparse.narrative.pages.length, 3);
   assert.equal(sparse.narrative.pages.some(page => page.type === 'days'), false);
+  assert.equal(sparse.narrative.pages.some(page => page.type === 'topics'), false);
   assert.ok(rich.narrative.pages.some(page => page.type === 'days'));
   assert.ok(rich.narrative.pages.every(page => !/历史深处|同一套书/.test(page.title + page.body)));
 });

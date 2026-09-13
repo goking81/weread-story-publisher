@@ -185,7 +185,7 @@ function collectTopics(categories, fallback) {
   if (Array.isArray(fallback)) candidates.push(...fallback);
   else if (typeof fallback === 'string') candidates.push(...fallback.split(/[·/、,，]/));
   const topics = [...new Set(candidates.map(value => typeof value === 'string' ? value.trim() : '').filter(Boolean))].slice(0, 4);
-  return topics.length ? topics : ['阅读'];
+  return topics;
 }
 
 function collectRankedBooks(items) {

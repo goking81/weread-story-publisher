@@ -58,15 +58,16 @@ The prepared UTF-8 JSON has this shape:
   "identity": { "mode": "name_avatar", "nickname": "阅读者", "avatarUrl": "https://example.com/avatar.jpg" },
   "report": {
     "year": 2026,
-    "focusPercent": 71,
-    "totalMinutes": 2096,
-    "booksRead": 9,
-    "topBook": { "title": "历史深处的民国（全集）", "minutes": 1482, "coverUrl": "https://example.com/cover.jpg" },
-    "topics": ["历史", "人物传记", "年代小说", "文学"]
+    "focusPercent": 42,
+    "totalMinutes": 1860,
+    "booksRead": 12,
+    "topBook": { "title": "用户阅读最多的一本书", "minutes": 780, "coverUrl": "https://example.com/cover.jpg" },
+    "topics": ["示例题材 A", "示例题材 B"]
   },
+  "narrative": { "version": 1, "pages": ["按可靠信号生成的 3–7 页"] },
   "share": {
-    "title": "2026，我一直在往历史深处走",
-    "description": "34小时56分，71%的阅读时间留给了同一本书",
+    "title": "2026 阅读故事 · 31小时0分",
+    "description": "31小时0分 · 读过 12 本，生成一份只属于这段阅读记录的故事",
     "imageUrl": "https://example.com/cover.jpg"
   },
   "expiresInDays": 30
