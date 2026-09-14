@@ -78,7 +78,7 @@ form.set('metadata', JSON.stringify({
   keep_bindings: ['secret_text'],
   assets: { jwt: completionJwt, config: { run_worker_first: true } },
   observability: { enabled: true, head_sampling_rate: 0.1 },
-  annotations: { 'workers/message': 'v0.1.4 data-driven stories' }
+  annotations: { 'workers/message': 'v0.1.7 story route hotfix' }
 }));
 form.set('worker.js', new Blob([await readFile(resolve(root, 'src/worker.js'))], { type: 'application/javascript+module' }), 'worker.js');
 const version = await api(`/accounts/${accountId}/workers/scripts/${scriptName}/versions?bindings_inherit=strict`, { method: 'POST', body: form });
@@ -88,7 +88,7 @@ await api(`/accounts/${accountId}/workers/scripts/${scriptName}/deployments`, {
   body: JSON.stringify({
     strategy: 'percentage',
     versions: [{ version_id: version.id, percentage: 100 }],
-    annotations: { 'workers/message': 'v0.1.4 data-driven stories' }
+    annotations: { 'workers/message': 'v0.1.7 story route hotfix' }
   })
 });
 console.log(`已发布 ${assets.length} 个静态资源和动态 Story Worker。`);

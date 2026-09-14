@@ -1,6 +1,6 @@
 {
   "name": "weread-story-publisher",
-  "version": "0.1.6",
+  "version": "0.1.7",
   "private": true,
   "description": "Publish tokenized, mobile reading-story links from verified reading data.",
   "type": "module",

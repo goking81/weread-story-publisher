@@ -9,12 +9,15 @@ test('Worker 实际运行时：加密存储、TTL、输入边界、限流及独�
     kvNamespaces: ['WEREAD_STORIES'],
     durableObjects: { PUBLISH_RATE_LIMITER: { className: 'PublishRateLimiter', useSQLite: true } },
     bindings: { RATE_LIMIT_SALT: 'test-salt', DEFAULT_EXPIRY_DAYS: 30, PUBLISH_MAX_PUBLISHES_PER_HOUR: 5 },
-    serviceBindings: { ASSETS: () => new Response('<html><head><title>默认标题</title><meta id="share-description"><meta id="share-og-title"><meta id="share-og-description"><meta id="share-og-image"><meta id="share-og-url"><meta id="share-item-name"><meta id="share-item-description"><meta id="share-item-image"><link id="share-image-src"><meta id="share-twitter-title"><meta id="share-twitter-description"><meta id="share-twitter-image"></head></html>', { headers: { 'Content-Type': 'text/html' } }) }
+    serviceBindings: { ASSETS: request => new URL(request.url).pathname === '/index.html'
+      ? new Response(null, { status: 307, headers: { Location: '/' } })
+      : new Response('<html><head><title>默认标题</title><meta id="share-description"><meta id="share-og-title"><meta id="share-og-description"><meta id="share-og-image"><meta id="share-og-url"><meta id="share-item-name"><meta id="share-item-description"><meta id="share-item-image"><link id="share-image-src"><meta id="share-twitter-title"><meta id="share-twitter-description"><meta id="share-twitter-image"></head></html>', { headers: { 'Content-Type': 'text/html' } }) }
   }] }));
   try {
     const root = await mf.dispatchFetch('https://story.test/');
     assert.equal(root.status, 404);
     assert.doesNotMatch(await root.text(), /历史深处|34小时56分/);
+    assert.equal((await mf.dispatchFetch('https://story.test/s/AAAAAAAAAAAAAAAAAA')).status, 404);
     const key = randomBytes(32);
     const iv = randomBytes(12);
     const cryptoKey = await crypto.subtle.importKey('raw', key, 'AES-GCM', false, ['encrypt', 'decrypt']);
@@ -41,6 +44,7 @@ test('Worker 实际运行时：加密存储、TTL、输入边界、限流及独�
     assert.equal(new TextDecoder().decode(plain), '阅读者的私密统计');
     const html = await mf.dispatchFetch(published.url);
     const sharedPage = await html.text();
+    assert.equal(html.status, 200);
     assert.match(sharedPage, /2026，我一直在往历史深处走/);
     assert.match(sharedPage, /https:\/\/story\.test\/assets\/history-deep-republic-one-hd\.jpg/);
     assert.match(sharedPage, new RegExp(`https://story\\.test/s/${published.slug}`));

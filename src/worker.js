@@ -73,12 +73,14 @@ async function revokeStory(request, env, slug) {
 async function storyPage(request, env) {
   const slug = new URL(request.url).pathname.split('/').pop();
   const story = await readStory(env, slug);
-  const assetUrl = new URL('/index.html', request.url);
+  if (!story) return unavailablePage();
+  // Workers Assets 默认会将 /index.html 重定向到 /；直取规范根路径以保留故事页的 200 响应。
+  const assetUrl = new URL('/', request.url);
   const response = await env.ASSETS.fetch(new Request(assetUrl, request));
   const headers = new Headers(response.headers);
   headers.set('Cache-Control', 'no-cache');
   headers.set('Referrer-Policy', 'no-referrer');
-  if (!story?.share) return new Response(response.body, { status: response.status, headers });
+  if (!story.share) return new Response(response.body, { status: response.status, headers });
 
   const pageUrl = new URL(request.url);
   pageUrl.hash = '';
