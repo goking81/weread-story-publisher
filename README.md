@@ -98,6 +98,15 @@ node <skill-directory>/scripts/environment.mjs --install-ffmpeg
 
 若缺少 FFmpeg，第二条命令会使用本机包管理器安装它：Windows 使用 `winget`，macOS 使用 Homebrew，受支持的 Linux 使用 apt。安装系统软件可能会要求管理员授权；没有受支持包管理器时，按终端提示先安装 FFmpeg，再继续。
 
+### 自动更新
+
+安装后的 Skill 会在实际开始工作时后台检查更新，最多每天一次。发现 GitHub `main` 上有更高版本，就会静默下载受限的 Skill 文件并按锁定版本刷新依赖；无网络或更新失败时仍继续使用现有版本，不会影响生成 Story。想立即查看或触发更新时，可运行：
+
+```powershell
+node <skill-directory>/scripts/update-skill.mjs --check
+node <skill-directory>/scripts/update-skill.mjs --apply
+```
+
 ### 1. 安装到本地 Agent
 
 此仓库中的核心 Skill 是可移植的本地目录，不依赖 Codex 专属运行时。能导入本地 Skill 目录或 ZIP 的 Agent（例如 WorkBuddy）都可使用以下四部分：
