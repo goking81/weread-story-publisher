@@ -9,3 +9,8 @@ data
 .local-publish.json
 *.url
 *.revoke.json
+.gh-config
+tools
+qa-artifacts
+*.qr.png
+weread-story-*.json

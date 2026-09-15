@@ -1,4 +1,5 @@
 node_modules/
+qa-artifacts/
 dist/
 .npm-cache/
 .wrangler/

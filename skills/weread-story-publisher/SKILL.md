@@ -9,11 +9,13 @@ Read the user's authorized annual statistics, compose a data-driven annual Story
 
 ## Portability
 
-This is a portable local Skill: the required runtime is Node.js 18+ plus the files in this directory. Codex-only UI metadata lives in `agents/openai.yaml` and is optional. Other agents should import the directory or a package containing `SKILL.md`, `scripts/`, `package.json`, and `package-lock.json`; do not copy API keys, generated reports, QR images, or revoke credentials into the package.
+This is a portable local Skill: it requires Node.js 18+ before installation or execution. Codex-only UI metadata lives in `agents/openai.yaml` and is optional. Other agents should import the directory or a package containing `SKILL.md`, `scripts/`, `package.json`, and `package-lock.json`; do not copy API keys, generated reports, QR images, or revoke credentials into the package.
+
+Before asking a user to install dependencies or run a script, check whether `node --version` succeeds and is at least v18. If it is absent or older, stop the workflow and direct the user to install the current Node.js LTS from the official Node.js download page for their operating system. After installation, they must reopen their Agent/terminal, confirm `node --version`, then install the Skill dependency with `npm ci --omit=dev --prefix <skill-directory>`. Do not attempt to install Node silently, ask for administrator credentials, or substitute an unofficial download.
 
 ## First use: local configuration page
 
-The local environment needs Node.js 18+. On the first request, guide the user to start the local setup page:
+Once Node.js 18+ and the Skill dependency are ready, guide the user to start the local setup page:
 
 ```text
 node <skill-directory>/scripts/setup.mjs
@@ -92,7 +94,7 @@ The command returns paths, not the secret link itself. Hand the generated QR ima
 
 Explain that scanning the QR opens the animated mobile Story. The user performs the final WeChat/Moments share. Do not claim that a share succeeded until the user verifies it on a real phone.
 
-The publisher derives a stronger first-person share title from the year and primary topic, plus a short numerical description and the hero-book cover. A caller may provide a reviewed `share` object to override those three public fields.
+The generated `share` object provides the public title, description, and cover. If absent in an older report, the publisher uses only the year, duration, and its own cover; it does not reuse prototype-specific wording. Review these fields before upload. Publishing an already prepared report does not require the WeRead API Key.
 
 ## Revoke
 
