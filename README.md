@@ -87,7 +87,16 @@ sequenceDiagram
 node --version
 ```
 
-如果没有输出版本号，或版本低于 18，请先从 [Node.js 官方下载页](https://nodejs.org/download/) 安装当前 LTS 版；安装完成后重新打开 Agent 或终端，再继续以下步骤。Skill 无法在没有 Node 的电脑上自行运行，也不会替用户静默安装系统软件。
+如果没有输出版本号，或版本低于 18，请先从 [Node.js 官方下载页](https://nodejs.org/download/) 安装当前 LTS 版；安装完成后重新打开 Agent 或终端，再继续以下步骤。Skill 无法在没有 Node 的电脑上自行运行。
+
+随后检查视频导出环境：
+
+```powershell
+node <skill-directory>/scripts/environment.mjs --status
+node <skill-directory>/scripts/environment.mjs --install-ffmpeg
+```
+
+若缺少 FFmpeg，第二条命令会使用本机包管理器安装它：Windows 使用 `winget`，macOS 使用 Homebrew，受支持的 Linux 使用 apt。安装系统软件可能会要求管理员授权；没有受支持包管理器时，按终端提示先安装 FFmpeg，再继续。
 
 ### 1. 安装到本地 Agent
 

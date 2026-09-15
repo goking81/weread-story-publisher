@@ -11,7 +11,9 @@ Read the user's authorized annual statistics, compose a data-driven annual Story
 
 This is a portable local Skill: it requires Node.js 18+ before installation or execution. Codex-only UI metadata lives in `agents/openai.yaml` and is optional. Other agents should import the directory or a package containing `SKILL.md`, `scripts/`, `package.json`, and `package-lock.json`; do not copy API keys, generated reports, QR images, or revoke credentials into the package.
 
-Before asking a user to install dependencies or run a script, check whether `node --version` succeeds and is at least v18. If it is absent or older, stop the workflow and direct the user to install the current Node.js LTS from the official Node.js download page for their operating system. After installation, they must reopen their Agent/terminal, confirm `node --version`, then install the Skill dependency with `npm ci --omit=dev --prefix <skill-directory>`. Do not attempt to install Node silently, ask for administrator credentials, or substitute an unofficial download.
+Before asking a user to install dependencies or run a script, check whether `node --version` succeeds and is at least v18. If it is absent or older, stop the workflow and direct the user to install the current Node.js LTS from the official Node.js download page for their operating system. After installation, they must reopen their Agent/terminal and confirm `node --version`.
+
+Then run `node <skill-directory>/scripts/environment.mjs --status`. If FFmpeg is missing, run `node <skill-directory>/scripts/environment.mjs --install-ffmpeg`; it uses the system package manager (`winget` on Windows, Homebrew on macOS, apt on supported Linux). Tell the user before invoking it because it installs system software and may ask for elevation. If no supported package manager or permission is available, stop and explain that FFmpeg must be installed before video export can be used. Then install the Skill dependency with `npm ci --omit=dev --prefix <skill-directory>`.
 
 ## First use: local configuration page
 
