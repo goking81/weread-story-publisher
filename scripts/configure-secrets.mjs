@@ -14,9 +14,9 @@ catch (error) {
 }
 delete secrets.PUBLISH_INVITE_CODES;
 const cli = spawn(process.execPath, ['node_modules/wrangler/bin/wrangler.js', 'secret', 'bulk'], {
-  env: { ...process.env, XDG_CONFIG_HOME: resolve('.wrangler-config') },
+  env: process.env,
   stdio: ['pipe', 'inherit', 'inherit']
 });
 cli.stdin.end(JSON.stringify(secrets));
 cli.on('error', error => { console.error(error.message); process.exitCode = 1; });
-cli.on('exit', code => { process.exitCode = code || 0; });
+cli.on('exit', code => { process.exitCode = code ?? 1; });

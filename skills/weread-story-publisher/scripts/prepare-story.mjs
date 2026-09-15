@@ -11,6 +11,7 @@ export function buildStoryFromReadData(data, { year, identity, expiresInDays = 3
   const rankedBooks = collectRankedBooks(data.readLongest);
   const rankedBook = rankedBooks[0];
   if (!rankedBook) throw new Error('年度统计中没有可用于主视觉的电子书及封面。');
+  if (rankedBook.seconds > totalSeconds) throw new Error('主书时长超过年度总时长，请核对年度统计。');
 
   const booksRead = parseBooksRead(data.readStat);
   const topics = collectTopics(data.preferCategory, rankedBook.categories);
@@ -23,7 +24,7 @@ export function buildStoryFromReadData(data, { year, identity, expiresInDays = 3
     year,
     totalMinutes,
     booksRead,
-    readDays: optionalPositiveInteger(data.readDays),
+    readDays: optionalPositiveInteger(data.readDays, new Date(Date.UTC(year, 1, 29)).getUTCMonth() === 1 ? 366 : 365),
     focusPercent,
     topBook: rankedBook,
     topBooks: rankedBooks.slice(0, 3),
@@ -55,10 +56,10 @@ export function buildNarrative(report) {
       metric: formatDuration(report.topBook.minutes),
       body: `${report.focusPercent}% 的阅读时间，留在这里。`, coverUrl: report.topBook.coverUrl
     },
-    report.readDays && {
+    report.readDays >= 2 && {
       type: 'days', score: Math.min(.85, report.readDays / 365), label: '阅读出现的日子',
       title: `${report.readDays} 天`, metric: '有效阅读日',
-      body: '阅读没有占满每一天，但它确实在这一年里反复出现。'
+      body: '这一年里，阅读反复出现在您的日常中。'
     },
     report.topics.length && {
       type: 'topics', score: .35 + (report.categoryFocus || 0) / 2, label: '时间落下的方向',
@@ -130,6 +131,7 @@ async function main() {
 
   const response = await fetch(API_URL, {
     method: 'POST',
+    signal: AbortSignal.timeout(30000),
     headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
     body: JSON.stringify({ api_name: '/readdata/detail', mode: 'annually', baseTime, skill_version: WEREAD_SKILL_VERSION })
   });
@@ -174,8 +176,8 @@ function parseArgs(args) {
 
 function parseBooksRead(stats) {
   const value = (Array.isArray(stats) ? stats : []).find(item => item?.stat === '读过')?.counts;
-  const match = String(value || '').match(/\d+/);
-  return match && Number(match[0]) > 0 ? Number(match[0]) : null;
+  const match = String(value || '').replace(/[,，]/g, '').match(/^\s*(\d+)(?:本)?\s*$/);
+  return match && Number(match[1]) > 0 ? Number(match[1]) : null;
 }
 
 function collectTopics(categories, fallback) {
@@ -191,25 +193,29 @@ function collectTopics(categories, fallback) {
 function collectRankedBooks(items) {
   return (Array.isArray(items) ? items : [])
     .map(item => {
-      if (!item?.book?.title || !item.book.cover || Number(item.readTime) <= 0) return null;
-      return {
-        title: cleanText(item.book.title, '主书书名'),
-        minutes: Math.max(1, Math.round(Number(item.readTime) / 60)),
-        seconds: Number(item.readTime),
-        coverUrl: normalizeHttpsUrl(item.book.cover, '主书封面'),
-        categories: item.book.category
-      };
-    }).filter(Boolean);
+      if (!item?.book?.title || !item.book.cover || !Number.isFinite(Number(item.readTime)) || Number(item.readTime) <= 0) return null;
+      try {
+        return {
+          title: cleanText(item.book.title, '主书书名'),
+          minutes: Math.max(1, Math.round(Number(item.readTime) / 60)),
+          seconds: Number(item.readTime),
+          coverUrl: normalizeHttpsUrl(item.book.cover, '主书封面'),
+          categories: item.book.category
+        };
+      } catch { return null; /* 可选书籍记录损坏时省略，不能使其他有效记录无法生成。 */ }
+    }).filter(Boolean).sort((left, right) => right.seconds - left.seconds);
 }
 
 function calculateCategoryFocus(categories) {
-  const values = (Array.isArray(categories) ? categories : []).map(item => Number(item?.readingTime)).filter(value => value > 0);
+  const values = (Array.isArray(categories) ? categories : []).map(item => Number(item?.readingTime)).filter(value => Number.isFinite(value) && value > 0);
   if (!values.length) return 0;
   return Math.max(...values) / values.reduce((sum, value) => sum + value, 0);
 }
 
 function selectPreferredAuthor(authors) {
-  const author = (Array.isArray(authors) ? authors : []).find(item => typeof item?.name === 'string' && Number(item?.count) >= 2);
+  const author = (Array.isArray(authors) ? authors : [])
+    .filter(item => typeof item?.name === 'string' && item.name.trim() && !/[\u0000-\u001f\u007f]/.test(item.name) && Number.isSafeInteger(Number(item.count)) && Number(item.count) >= 2)
+    .sort((left, right) => Number(right.count) - Number(left.count))[0];
   return author ? { name: cleanText(author.name, '偏好作者'), count: Number(author.count) } : null;
 }
 
@@ -225,9 +231,9 @@ function calculateReadingRhythm(preferTime) {
   return total >= 36_000 && leader.seconds / total >= .35 ? { label: leader.label, share: leader.seconds / total } : null;
 }
 
-function optionalPositiveInteger(value) {
+function optionalPositiveInteger(value, maximum = Number.MAX_SAFE_INTEGER) {
   const number = Number(value);
-  return Number.isInteger(number) && number > 0 ? number : null;
+  return Number.isSafeInteger(number) && number > 0 && number <= maximum ? number : null;
 }
 
 function optionalPercentage(value) {
@@ -236,7 +242,7 @@ function optionalPercentage(value) {
 }
 
 function percentage(part, whole) {
-  return Math.min(100, Math.max(1, Math.round(part / whole * 100)));
+  return Math.round(part / whole * 100);
 }
 
 function formatDuration(minutes) {

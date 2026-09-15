@@ -14,20 +14,21 @@ export function getConfigPath() {
   return join(resolve(base), 'credentials.json');
 }
 
-export async function loadConfiguration() {
+export async function loadConfiguration({ requireApiKey = true } = {}) {
   let saved = {};
   try {
     saved = JSON.parse(await readFile(getConfigPath(), 'utf8'));
+    if (!saved || typeof saved !== 'object' || Array.isArray(saved)) throw new Error('无效配置');
   } catch (error) {
     if (error.code !== 'ENOENT') throw new Error('本地微信读书配置文件无法读取，请重新运行 setup.mjs。');
   }
 
   const apiKey = process.env.WEREAD_API_KEY || saved.apiKey;
   const publishUrl = process.env.WEREAD_STORY_PUBLISH_URL || saved.publishUrl || DEFAULT_PUBLISH_URL;
-  if (typeof apiKey !== 'string' || !apiKey.trim()) {
+  if (requireApiKey && (typeof apiKey !== 'string' || !apiKey.trim())) {
     throw new Error(`尚未配置微信读书 API Key。请在本机运行 node <skill-directory>/scripts/setup.mjs，然后在打开的本地页面完成配置。`);
   }
-  return { apiKey: apiKey.trim(), publishUrl: normalizePublishUrl(publishUrl) };
+  return { apiKey: typeof apiKey === 'string' ? apiKey.trim() : undefined, publishUrl: normalizePublishUrl(publishUrl) };
 }
 
 export async function saveConfiguration(apiKey) {
@@ -43,7 +44,7 @@ export async function saveConfiguration(apiKey) {
 function normalizePublishUrl(value) {
   try {
     const url = new URL(String(value));
-    if (url.protocol !== 'https:') throw new Error();
+    if (url.protocol !== 'https:' || url.username || url.password || url.search || url.hash || url.pathname !== '/') throw new Error();
     return url.href.replace(/\/$/, '');
   } catch {
     throw new Error('发布地址必须是 HTTPS URL。');

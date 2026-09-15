@@ -36,7 +36,7 @@ export class PublishRateLimiter extends DurableObject {
 async function route(request, env) {
   const url = new URL(request.url);
   const { pathname } = url;
-  if (request.method === 'GET' && (pathname === '/' || pathname === '/index.html')) return unavailablePage();
+  if (pathname === '/' || pathname === '/index.html') return unavailablePage();
   if (request.method === 'GET' && pathname === '/health') return json({ ok: true });
   if (request.method === 'POST' && pathname === '/api/stories') return createStory(request, env, url);
 
@@ -76,9 +76,14 @@ async function storyPage(request, env) {
   if (!story) return unavailablePage();
   // Workers Assets 默认会将 /index.html 重定向到 /；直取规范根路径以保留故事页的 200 响应。
   const assetUrl = new URL('/', request.url);
-  const response = await env.ASSETS.fetch(new Request(assetUrl, request));
+  // 不转发浏览器的条件缓存头，避免资源绑定返回无正文的 304 后跳过分享字段重写。
+  const response = await env.ASSETS.fetch(new Request(assetUrl));
+  if (response.status !== 200) return json({ error: '故事页面暂时不可用，请稍后重试。' }, 503);
   const headers = new Headers(response.headers);
   headers.set('Cache-Control', 'no-cache');
+  headers.delete('ETag');
+  headers.delete('Last-Modified');
+  headers.set('X-Robots-Tag', 'noindex, nofollow');
   headers.set('Referrer-Policy', 'no-referrer');
   if (!story.share) return new Response(response.body, { status: response.status, headers });
 

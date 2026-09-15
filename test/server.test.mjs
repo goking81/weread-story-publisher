@@ -13,7 +13,7 @@ const baseUrl = `http://127.0.0.1:${port}`;
 const dataDirectory = await mkdtemp(join(tmpdir(), 'weread-story-test-'));
 const server = spawn(process.execPath, ['server.mjs'], {
   cwd: root,
-  env: { ...process.env, PORT: String(port), PUBLIC_BASE_URL: baseUrl, DEFAULT_EXPIRY_DAYS: '30', STORY_DATA_FILE: join(dataDirectory, 'stories.json') },
+  env: { ...process.env, PORT: String(port), PUBLIC_BASE_URL: baseUrl, DEFAULT_EXPIRY_DAYS: '30', PUBLISH_MAX_PUBLISHES_PER_HOUR: '100', STORY_DATA_FILE: join(dataDirectory, 'stories.json') },
   stdio: 'ignore'
 });
 
@@ -65,6 +65,23 @@ test('只保存密文、浏览器可解密，并能撤销一份故事', async (c
   const revoked = await fetch(`${baseUrl}/api/stories/${published.slug}`, { method: 'DELETE', headers: { 'X-Story-Revoke': revokeHash } });
   assert.equal(revoked.status, 204);
   assert.equal((await fetch(`${baseUrl}/api/stories/${published.slug}`)).status, 404);
+  const concurrent = await Promise.all(Array.from({ length: 12 }, async () => {
+    const response = await fetch(`${baseUrl}/api/stories`, { method: 'POST', body: JSON.stringify({ envelope, revokeHash,
+      share: { title: '测试标题 <script> & $&', description: '公开摘要 "><img>', imageUrl: 'https://example.com/test.jpg' } }) });
+    assert.equal(response.status, 201);
+    return response.json();
+  }));
+  const saved = JSON.parse(await readFile(join(dataDirectory, 'stories.json'), 'utf8'));
+  assert.equal(saved.stories.length, 12);
+  assert.equal(new Set(saved.stories.map(story => story.slug)).size, 12);
+  const escaped = await (await fetch(concurrent[0].url)).text();
+  assert.match(escaped, /&lt;script&gt; &amp; \$&amp;/);
+  assert.doesNotMatch(escaped, /<img>/);
+  const deletes = await Promise.all(concurrent.map(story => fetch(story.url.replace('/s/', '/api/stories/'), {
+    method: 'DELETE', headers: { 'X-Story-Revoke': revokeHash }
+  })));
+  assert.ok(deletes.every(response => response.status === 204));
+  assert.equal(JSON.parse(await readFile(join(dataDirectory, 'stories.json'), 'utf8')).stories.length, 0);
 });
 
 async function encryptStory(story) {

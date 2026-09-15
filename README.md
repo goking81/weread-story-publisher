@@ -81,6 +81,23 @@ sequenceDiagram
 
 需要 Node.js 18+，以及一份用户自己已授权的微信读书 API Key。该 Key 不是微信密码、短信验证码或支付信息。
 
+先在本机运行：
+
+```powershell
+node --version
+```
+
+如果没有输出版本号，或版本低于 18，请先从 [Node.js 官方下载页](https://nodejs.org/download/) 安装当前 LTS 版；安装完成后重新打开 Agent 或终端，再继续以下步骤。Skill 无法在没有 Node 的电脑上自行运行。
+
+随后检查视频导出环境：
+
+```powershell
+node <skill-directory>/scripts/environment.mjs --status
+node <skill-directory>/scripts/environment.mjs --install-ffmpeg
+```
+
+若缺少 FFmpeg，第二条命令会使用本机包管理器安装它：Windows 使用 `winget`，macOS 使用 Homebrew，受支持的 Linux 使用 apt。安装系统软件可能会要求管理员授权；没有受支持包管理器时，按终端提示先安装 FFmpeg，再继续。
+
 ### 1. 安装到本地 Agent
 
 此仓库中的核心 Skill 是可移植的本地目录，不依赖 Codex 专属运行时。能导入本地 Skill 目录或 ZIP 的 Agent（例如 WorkBuddy）都可使用以下四部分：
@@ -108,6 +125,21 @@ npm ci --omit=dev --prefix "$env:USERPROFILE/.codex/skills/weread-story-publishe
 ```powershell
 npm ci --omit=dev --prefix <skill-directory>
 ```
+
+### 可选：本地视频发布
+
+如果不希望使用临时网页链接，可以将同一份已审核的 Story 渲染为竖屏 MP4，保存到手机相册后直接发朋友圈。这样不依赖 `readstory.learnbox.cc`，动画会以视频形式保留；代价是视频不再可上下滑动、无法撤销，也不能在发布后更新内容。
+
+HyperFrames 适合承担未来的“视频导出器”角色：它能将 HTML/CSS 动效确定性地渲染为 MP4，并提供检查与高质量导出命令。[HyperFrames 渲染文档](https://github.com/heygen-com/hyperframes/blob/main/docs/guides/rendering.mdx) 说明了 MP4 导出流程。它本身也需要 Node，且本地渲染通常需要 FFmpeg，因此应作为已有本机环境用户的**可选发布模式**，而不是替代本 Skill 的首次安装流程。
+
+> v0.1.8 尚未内置视频导出；当前交付仍是加密动态链接、二维码和撤销。视频模式应在单独实现并完成手机相册/朋友圈实测后再开放。
+
+建议产品同时保留两种交付：
+
+| 模式 | 适用场景 | 取舍 |
+| --- | --- | --- |
+| 动态链接 + 二维码 | 想保留滑动与互动感、可在 30 天内撤销 | 需要临时站点，微信可能提示外链风险 |
+| 本地 MP4 | 想直接发朋友圈、完全不依赖域名 | 动效保留为视频，不能交互或撤销 |
 
 ### 2. 先从已授权渠道取得自己的 API Key
 

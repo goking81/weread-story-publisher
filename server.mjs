@@ -20,9 +20,10 @@ const staticFiles = new Map([
 ]);
 const mimeTypes = { '.css': 'text/css; charset=utf-8', '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8', '.mjs': 'text/javascript; charset=utf-8', '.jpg': 'image/jpeg', '.png': 'image/png' };
 let stories = await loadStories();
+let mutations = Promise.resolve();
 
 await purgeExpiredStories();
-setInterval(() => purgeExpiredStories().catch(console.error), 3600000).unref();
+setInterval(() => mutate(() => purgeExpiredStories()).catch(console.error), 3600000).unref();
 
 createServer(async (request, response) => {
   try {
@@ -37,18 +38,34 @@ async function route(request, response) {
   const url = new URL(request.url, `http://${request.headers.host || 'localhost'}`);
   const pathname = decodeURIComponent(url.pathname);
 
-  if (request.method === 'GET' && (pathname === '/' || pathname === '/index.html')) return sendUnavailable(response);
+  if (pathname === '/' || pathname === '/index.html') return sendUnavailable(response);
   if (request.method === 'GET' && pathname === '/health') return sendJson(response, 200, { ok: true });
-  if (request.method === 'POST' && pathname === '/api/stories') return createStory(request, response, url);
+  if (request.method === 'POST' && pathname === '/api/stories') return mutate(() => createStory(request, response, url));
 
   const storyMatch = pathname.match(/^\/api\/stories\/([A-Za-z0-9_-]{12,})$/);
   if (request.method === 'GET' && storyMatch) return getStory(response, storyMatch[1]);
-  if (request.method === 'DELETE' && storyMatch) return revokeStory(request, response, storyMatch[1]);
+  if (request.method === 'DELETE' && storyMatch) return mutate(() => revokeStory(request, response, storyMatch[1]));
 
   const publicMatch = pathname.match(/^\/s\/([A-Za-z0-9_-]{12,})$/);
   if (request.method === 'GET' && publicMatch) {
-    if (!findActiveStory(publicMatch[1])) return sendText(response, 404, '这份阅读故事已失效或不存在。');
-    return sendFile(response, 'public/index.html');
+    const story = findActiveStory(publicMatch[1]);
+    if (!story) return sendUnavailable(response);
+    let html = await readFile(join(root, 'public/index.html'), 'utf8');
+    if (story.share) {
+      const { title, description, imageUrl } = story.share;
+      html = html.replace(/<title>[^<]*<\/title>/, () => `<title>${escapeHtml(title)}</title>`);
+      const values = { 'share-description': description, 'share-og-title': title, 'share-og-description': description,
+        'share-og-image': new URL(imageUrl, originFor(url)).href, 'share-og-url': `${originFor(url)}/s/${story.slug}`,
+        'share-item-name': title, 'share-item-description': description, 'share-item-image': new URL(imageUrl, originFor(url)).href,
+        'share-image-src': new URL(imageUrl, originFor(url)).href, 'share-twitter-title': title,
+        'share-twitter-description': description, 'share-twitter-image': new URL(imageUrl, originFor(url)).href };
+      html = html.replace(/<(?:meta|link)\b[^>]*>/g, tag => {
+        const value = values[/\bid="([^"]+)"/.exec(tag)?.[1]];
+        return value === undefined ? tag : tag.replace(/\b(content|href)="[^"]*"/, (_, name) => `${name}="${escapeHtml(value)}"`);
+      });
+    }
+    return response.writeHead(200, { 'Content-Type': 'text/html; charset=utf-8', 'Cache-Control': 'no-cache',
+      'Referrer-Policy': 'no-referrer', 'X-Robots-Tag': 'noindex, nofollow' }).end(html);
   }
 
   const assetMatch = pathname.match(/^\/(?:s\/)?assets\/([A-Za-z0-9._-]+)$/);
@@ -85,7 +102,7 @@ async function revokeStory(request, response, slug) {
 
 function normalizeEnvelope(payload) {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) throw badRequest('请求体必须是加密信封。');
-  const allowedKeys = new Set(['envelope', 'revokeHash', 'expiresInDays']);
+  const allowedKeys = new Set(['envelope', 'revokeHash', 'expiresInDays', 'share']);
   if (Object.keys(payload).some(key => !allowedKeys.has(key))) throw badRequest('发布接口不接收明文阅读数据。');
   const envelope = payload.envelope;
   if (!envelope || typeof envelope !== 'object' || envelope.version !== 1) throw badRequest('无效的加密信封版本。');
@@ -98,6 +115,7 @@ function normalizeEnvelope(payload) {
     createdAt: new Date().toISOString(),
     expiresAt: new Date(Date.now() + expiresInDays * 86400000).toISOString(),
     revokeHash,
+    share: normalizeShare(payload.share),
     envelope: { version: 1, iv, ciphertext }
   };
 }
@@ -116,7 +134,7 @@ async function purgeExpiredStories() {
 }
 
 function sameSecret(provided, expected) {
-  if (typeof provided !== 'string' || provided.length !== expected.length) return false;
+  if (typeof provided !== 'string' || !/^[A-Za-z0-9_-]{43}$/.test(provided) || provided.length !== expected.length) return false;
   return timingSafeEqual(Buffer.from(provided), Buffer.from(expected));
 }
 
@@ -160,6 +178,35 @@ async function saveStories() {
   const temporaryFile = `${dataFile}.${process.pid}.${Date.now()}.tmp`;
   await writeFile(temporaryFile, JSON.stringify({ version: 2, stories }, null, 2), { encoding: 'utf8', mode: 0o600 });
   await rename(temporaryFile, dataFile);
+}
+
+// 单进程本地存储串行提交；写入失败时恢复内存，避免返回失败却改变报告状态。
+function mutate(action) {
+  const result = mutations.then(async () => {
+    const previous = stories.slice();
+    try { return await action(); } catch (error) { stories = previous; throw error; }
+  });
+  mutations = result.catch(() => {});
+  return result;
+}
+
+function escapeHtml(value) {
+  return String(value).replace(/[&<>"']/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[char]);
+}
+
+function normalizeShare(share) {
+  if (share === undefined) return null;
+  if (!share || typeof share !== 'object' || Array.isArray(share) || Object.keys(share).some(key => !['title', 'description', 'imageUrl'].includes(key))) throw badRequest('share 格式无效。');
+  const result = {};
+  for (const [name, minimum, maximum] of [['title', 8, 60], ['description', 1, 120], ['imageUrl', 1, 2000]]) {
+    const value = share[name]?.trim?.();
+    if (!value || value.length < minimum || value.length > maximum || /[\u0000-\u001f\u007f]/.test(value)) throw badRequest(`share.${name} 长度或字符无效。`);
+    result[name] = value;
+  }
+  let url;
+  try { url = new URL(result.imageUrl, 'https://share.invalid'); } catch { throw badRequest('share.imageUrl 格式无效。'); }
+  if (url.protocol !== 'https:' || (!result.imageUrl.startsWith('/') && url.origin === 'https://share.invalid')) throw badRequest('share.imageUrl 必须是 HTTPS 地址或站内绝对路径。');
+  return result;
 }
 
 async function sendFile(response, relativePath) {

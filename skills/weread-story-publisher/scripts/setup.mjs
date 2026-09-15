@@ -20,6 +20,13 @@ async function hasLocalConfiguration() {
 
 async function startSetup() {
   const server = createServer(async (request, response) => {
+    const expectedHost = `127.0.0.1:${server.address().port}`;
+    // 仅接受本地表单的同源 JSON 请求，拒绝其他网页及 DNS 重绑定。
+    if (request.headers.host !== expectedHost || (request.method === 'POST' &&
+        (request.headers.origin !== `http://${expectedHost}` || request.headers['content-type']?.split(';')[0] !== 'application/json'))) {
+      response.writeHead(403, { 'Cache-Control': 'no-store' }).end();
+      return;
+    }
     if (request.method === 'GET' && request.url === '/') return html(response);
     if (request.method === 'POST' && request.url === '/configure') return configure(request, response, server);
     response.writeHead(404, { 'Cache-Control': 'no-store' }).end();
@@ -34,7 +41,7 @@ async function startSetup() {
 async function configure(request, response, server) {
   try {
     const body = await readJson(request);
-    await saveConfiguration(body.apiKey);
+    await saveConfiguration(body?.apiKey);
     response.writeHead(200, { 'Content-Type': 'application/json; charset=utf-8', 'Cache-Control': 'no-store' });
     response.end(JSON.stringify({ ok: true }));
     server.close();
