@@ -1,5 +1,7 @@
 import { spawnSync } from 'node:child_process';
 import { cp, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { get as httpGet } from 'node:http';
+import { get as httpsGet } from 'node:https';
 import { tmpdir, homedir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -66,10 +68,7 @@ async function recordCheck() {
 async function remoteFile(path) {
   const safe = safePath(path);
   const encoded = safe.split('/').map(encodeURIComponent).join('/');
-  const response = await fetch(`${apiBase}/repos/${repository}/contents/${sourceRoot}/${encoded}?ref=${encodeURIComponent(ref)}`, {
-    headers: { Accept: 'application/vnd.github+json', ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) },
-    signal: AbortSignal.timeout(10000)
-  });
+  const response = await fetchUpdateSource(`${apiBase}/repos/${repository}/contents/${sourceRoot}/${encoded}?ref=${encodeURIComponent(ref)}`);
   if (!response.ok) throw new Error(`无法读取更新源（${response.status}）`);
   const data = await response.json();
   if (data.type !== 'file' || typeof data.content !== 'string') throw new Error(`更新源文件无效：${safe}`);
@@ -79,10 +78,7 @@ async function remoteFile(path) {
 async function remoteDirectory(path) {
   const safe = safePath(path);
   const encoded = safe.split('/').map(encodeURIComponent).join('/');
-  const response = await fetch(`${apiBase}/repos/${repository}/contents/${sourceRoot}/${encoded}?ref=${encodeURIComponent(ref)}`, {
-    headers: { Accept: 'application/vnd.github+json', ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) },
-    signal: AbortSignal.timeout(10000)
-  });
+  const response = await fetchUpdateSource(`${apiBase}/repos/${repository}/contents/${sourceRoot}/${encoded}?ref=${encodeURIComponent(ref)}`);
   if (!response.ok) throw new Error(`无法读取更新目录（${response.status}）`);
   const data = await response.json();
   if (!Array.isArray(data)) throw new Error(`更新源目录无效：${safe}`);
@@ -110,6 +106,25 @@ async function installRemoteSkill(remoteVersion) {
   } finally {
     await rm(staging, { recursive: true, force: true });
   }
+}
+
+async function fetchUpdateSource(url) {
+  const target = new URL(url);
+  const get = target.protocol === 'https:' ? httpsGet : httpGet;
+  return new Promise((resolveRequest, rejectRequest) => {
+    const request = get(target, {
+      headers: { Accept: 'application/vnd.github+json', 'User-Agent': 'weread-story-publisher', ...(process.env.GITHUB_TOKEN ? { Authorization: `Bearer ${process.env.GITHUB_TOKEN}` } : {}) }
+    }, response => {
+      const chunks = [];
+      response.on('data', chunk => chunks.push(chunk));
+      response.on('end', () => {
+        const text = Buffer.concat(chunks).toString('utf8');
+        resolveRequest({ ok: response.statusCode >= 200 && response.statusCode < 300, status: response.statusCode, json: async () => JSON.parse(text) });
+      });
+    });
+    request.setTimeout(10000, () => request.destroy(new Error('更新检查超时')));
+    request.on('error', rejectRequest);
+  });
 }
 
 function safePath(path) {
