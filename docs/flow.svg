@@ -1,14 +1,31 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="1200" height="470" viewBox="0 0 1200 470" role="img" aria-labelledby="title desc">
-  <title id="title">WeRead Story 的本地生成与临时发布流程</title>
-  <desc id="desc">用户的微信读书授权数据先在本机整理和审阅，再本机加密。服务端只保存密文与用于微信卡片的最少公开字段，手机通过带本地密钥的链接打开动态故事。</desc>
-  <rect width="1200" height="470" fill="#f3eee3"/>
-  <g fill="none" stroke="#d8a741" stroke-width="3" stroke-linecap="round"><path d="M276 235h54"/><path d="M564 235h54"/><path d="M852 235h54"/><path d="m318 226 12 9-12 9m276-18 12 9-12 9m276-18 12 9-12 9"/></g>
-  <g font-family="system-ui, -apple-system, 'Microsoft YaHei', sans-serif">
-    <g transform="translate(42 92)"><rect width="234" height="286" rx="18" fill="#13213b"/><text x="28" y="58" fill="#d8a741" font-size="16" letter-spacing="2">01 · 本机读取</text><text x="28" y="111" fill="#fffaf0" font-size="31" font-weight="700">用户自己的</text><text x="28" y="151" fill="#fffaf0" font-size="31" font-weight="700">微信读书数据</text><text x="28" y="212" fill="#bbc5d4" font-size="17">API Key 不离开本机</text><text x="28" y="243" fill="#bbc5d4" font-size="17">原始回包不上传</text></g>
-    <g transform="translate(330 92)"><rect width="234" height="286" rx="18" fill="#fffaf0" stroke="#d8a741"/><text x="28" y="58" fill="#a26a17" font-size="16" letter-spacing="2">02 · 先确认</text><text x="28" y="111" fill="#13213b" font-size="31" font-weight="700">按可靠信号</text><text x="28" y="151" fill="#13213b" font-size="31" font-weight="700">生成 3–7 页</text><text x="28" y="212" fill="#5d6880" font-size="17">弱数据自动省略</text><text x="28" y="243" fill="#5d6880" font-size="17">封面、标题由用户审核</text></g>
-    <g transform="translate(618 92)"><rect width="234" height="286" rx="18" fill="#13213b"/><text x="28" y="58" fill="#d8a741" font-size="16" letter-spacing="2">03 · 本机加密</text><text x="28" y="111" fill="#fffaf0" font-size="31" font-weight="700">临时发布</text><text x="28" y="151" fill="#fffaf0" font-size="31" font-weight="700">30 天</text><text x="28" y="212" fill="#bbc5d4" font-size="17">云端保存 AES-GCM 密文</text><text x="28" y="243" fill="#bbc5d4" font-size="17">可用独立凭据撤销</text></g>
-    <g transform="translate(906 92)"><rect width="234" height="286" rx="18" fill="#fffaf0" stroke="#d8a741"/><text x="28" y="58" fill="#a26a17" font-size="16" letter-spacing="2">04 · 手机分享</text><text x="28" y="111" fill="#13213b" font-size="31" font-weight="700">扫码打开</text><text x="28" y="151" fill="#13213b" font-size="31" font-weight="700">动态 Story</text><text x="28" y="212" fill="#5d6880" font-size="17">链接末尾的 # 密钥</text><text x="28" y="243" fill="#5d6880" font-size="17">不发送到服务器</text></g>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 560 320" width="100%" role="img" aria-label="流程图">
+  <title>处理流程</title>
+  <defs>
+    <marker id="ar" markerWidth="10" markerHeight="10" refX="7" refY="3" orient="auto">
+      <path d="M0,0 L7,3 L0,6 Z" fill="#d4662a"/>
+    </marker>
+  </defs>
+  <g transform="translate(40,90)">
+    <rect width="100" height="120" rx="14" fill="#ffffff" stroke="#d4662a" stroke-width="3"/>
+    <text x="50" y="55" font-family="'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif" font-size="26" font-weight="700" fill="#111827" text-anchor="middle">本机</text>
+    <text x="50" y="82" font-family="'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif" font-size="13" fill="#6b7280" text-anchor="middle">提取可靠信号</text>
   </g>
-  <text x="42" y="42" fill="#13213b" font-family="Georgia, 'Songti SC', serif" font-size="25">每个人的阅读轨迹不同，故事也不应使用同一份模板。</text>
-  <text x="42" y="425" fill="#6c7588" font-family="system-ui, -apple-system, 'Microsoft YaHei', sans-serif" font-size="15">微信卡片需要读取的标题、摘要与书封会作为最少公开字段保存；完整报告保持加密。</text>
+  <line x1="140" y1="150" x2="160" y2="150" stroke="#d4662a" stroke-width="3" marker-end="url(#ar)"/>
+  <g transform="translate(160,90)">
+    <rect width="100" height="120" rx="14" fill="#ffffff" stroke="#d4662a" stroke-width="3"/>
+    <text x="50" y="55" font-family="'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif" font-size="26" font-weight="700" fill="#111827" text-anchor="middle">加密</text>
+    <text x="50" y="82" font-family="'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif" font-size="13" fill="#6b7280" text-anchor="middle">AES-GCM 密文</text>
+  </g>
+  <line x1="260" y1="150" x2="280" y2="150" stroke="#d4662a" stroke-width="3" marker-end="url(#ar)"/>
+  <g transform="translate(280,90)">
+    <rect width="100" height="120" rx="14" fill="#ffffff" stroke="#d4662a" stroke-width="3"/>
+    <text x="50" y="55" font-family="'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif" font-size="26" font-weight="700" fill="#111827" text-anchor="middle">发布</text>
+    <text x="50" y="82" font-family="'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif" font-size="13" fill="#6b7280" text-anchor="middle">临时链接+二维码</text>
+  </g>
+  <line x1="380" y1="150" x2="400" y2="150" stroke="#d4662a" stroke-width="3" marker-end="url(#ar)"/>
+  <g transform="translate(400,90)">
+    <rect width="100" height="120" rx="14" fill="#ffffff" stroke="#d4662a" stroke-width="3"/>
+    <text x="50" y="55" font-family="'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif" font-size="26" font-weight="700" fill="#111827" text-anchor="middle">手机</text>
+    <text x="50" y="82" font-family="'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif" font-size="13" fill="#6b7280" text-anchor="middle">扫码打开</text>
+  </g>
 </svg>
