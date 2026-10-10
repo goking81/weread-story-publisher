@@ -1,0 +1,21 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 360" width="100%" role="img" aria-label="WeRead Story Publisher">
+  <title>WeRead Story Publisher · 项目首屏图</title>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0" stop-color="#ffffff"/>
+      <stop offset="1" stop-color="#f3f4f6"/>
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="360" rx="24" fill="url(#bg)"/>
+  <rect x="0" y="0" width="10" height="360" fill="#d4662a"/>
+  <g font-family="'PingFang SC','Microsoft YaHei','Noto Sans SC',system-ui,sans-serif">
+    <text x="72" y="150" font-size="56" font-weight="700" fill="#111827">WeRead Story Publisher</text>
+    <text x="74" y="205" font-size="24" fill="#6b7280">微信读书年度阅读 Story</text>
+    <text x="74" y="300" font-size="20" fill="#d4662a" font-weight="600">本地生成 → 加密 → 手机打开</text>
+  </g>
+  <g transform="translate(940,80)" stroke="#d4662a" fill="none" stroke-width="6" stroke-linecap="round">
+    <circle cx="120" cy="100" r="64" fill="#d4662a" opacity="0.10"/>
+    <circle cx="120" cy="100" r="44"/>
+    <line x1="154" y1="134" x2="200" y2="180" stroke-width="10"/>
+  </g>
+</svg>
